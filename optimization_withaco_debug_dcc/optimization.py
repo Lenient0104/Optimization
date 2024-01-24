@@ -363,7 +363,7 @@ class Optimization:
         iterations = list(range(1, len(time_cost) + 1))
         y_value = []
         for time in time_cost:
-            y_value.append(time - 69.77190876350541)
+            y_value.append(time - min(time_cost))
 
         # y_value.append(0)
         # y_value.append(0)
