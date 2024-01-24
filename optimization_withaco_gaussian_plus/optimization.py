@@ -437,7 +437,6 @@ class Optimization:
                 print(ant.path)
                 ants_found.append(ant)
                 # print("time cost:", ant.total_time_cost)
-
                 if ant.total_time_cost <= best_time_cost:
                     # print("curren best time cost", best_time_cost)
                     # print("curren time cost", ant.total_time_cost)
