@@ -1,0 +1,58 @@
+old_start_id = '3789374#3'
+old_end_id = '41592115'
+
+
+
+Presolve time: 0.31s
+Presolved: 24101 rows, 68543 columns, 190801 nonzeros
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.785000000000e+02, best bound 2.785000000000e+02, gap 0.0000%
+
+Execution time: 7.21 seconds
+Total Cost:  278.5000000000001
+
+
+Optimal Path Sequence with Costs: [('3789374#3', '-6273612#5', 'walk', 69), ('-6273612#5', 'walk', 'ec', 0.1), ('-6273612#5', '-6273612#1', 'ec', 3), ('-6273612#1', '35078319#0', 'ec', 5), ('35078319#0', '35078322#0', 'ec', 2), ('35078322#0', '52321641#4', 'ec', 2), ('52321641#4', '317027067', 'ec', 1), ('317027067', '4396159#0', 'ec', 5), ('4396159#0', '75589201', 'ec', 3), ('75589201', 'ec', 'eb', 0.1), ('75589201', '80439756#0', 'eb', 14), ('80439756#0', '4396064#1', 'eb', 19), ('4396064#1', '360319695#0', 'eb', 10), ('360319695#0', '4396161#0', 'eb', 15), ('4396161#0', '4395699', 'eb', 19), ('4395699', '4395700#0', 'eb', 18), ('4395700#0', '37692282#0', 'eb', 16), ('37692282#0', '37692282#3', 'eb', 10), ('37692282#3', 'eb', 'ec', 0.1), ('37692282#3', '-29333273#2', 'ec', 5), ('-29333273#2', '-41228866#1', 'ec', 2), ('-41228866#1', '41592113#0', 'ec', 3), ('41592113#0', 'ec', 'eb', 0.1), ('41592113#0', '41592113#1', 'eb', 17), ('41592113#1', '376394520#1', 'eb', 10), ('376394520#1', '41592114', 'eb', 18), ('41592114', '41592115', 'eb', 12), ('41592115', 'eb', 'walk', 0.1)]
+Mapped Optimal Path Sequence with Costs: [(6233, 3194, 'walk', 69), (3194, 'walk', 'ec', 0.1), (3194, 2922, 'ec', 3), (2922, 4674, 'ec', 5), (4674, 3512, 'ec', 2), (3512, 6043, 'ec', 2), (6043, 5949, 'ec', 1), (5949, 5950, 'ec', 5), (5950, 3911, 'ec', 3), (3911, 'ec', 'eb', 0.1), (3911, 6579, 'eb', 14), (6579, 6392, 'eb', 19), (6392, 6064, 'eb', 10), (6064, 6065, 'eb', 15), (6065, 6380, 'eb', 19), (6380, 6383, 'eb', 18), (6383, 6176, 'eb', 16), (6176, 2096, 'eb', 10), (2096, 'eb', 'ec', 0.1), (2096, 2089, 'ec', 5), (2089, 2092, 'ec', 2), (2092, 3667, 'ec', 3), (3667, 'ec', 'eb', 0.1), (3667, 6330, 'eb', 17), (6330, 6170, 'eb', 10), (6170, 3287, 'eb', 18), (3287, 6331, 'eb', 12), (6331, 'eb', 'walk', 0.1)]
+Total Number of Station Changes: 5
+
+[1m
+Path for vehicle 'eb':[0m
+  Start node: 75589201
+  End node: 37692282#3
+  Initial SoC at Start node: 60%
+  Total energy consumed for this path: 11.02%
+
+Details of the path:
+  75589201 -> 80439756#0 (eb): Energy consumed = 1.06
+[1m
+Path for vehicle 'eb':[0m
+  Start node: 41592113#0
+  End node: 41592115
+  Initial SoC at Start node: 22%
+  Total energy consumed for this path: 6.80%
+
+Details of the path:
+  41592113#0 -> 41592113#1 (eb): Energy consumed = 1.75
+[1m
+Path for vehicle 'ec':[0m
+  Start node: -6273612#5
+  End node: 75589201
+  Initial SoC at Start node: 32%
+  Total energy consumed for this path: 38.87%
+
+Details of the path:
+  -6273612#5 -> -6273612#1 (ec): Energy consumed = 5.38
+[1m
+Path for vehicle 'ec':[0m
+  Start node: 37692282#3
+  End node: 41592113#0
+  Initial SoC at Start node: 32%
+  Total energy consumed for this path: 15.56%
+
+Details of the path:
+  37692282#3 -> -29333273#2 (ec): Energy consumed = 5.49
+
+
+Energy is not enough.
