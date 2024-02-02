@@ -8,6 +8,8 @@ from aco import Ant
 import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from heapq import heappush, heappop
+from collections import defaultdict
 from e_car import ECar_EnergyConsumptionModel
 from e_bike import Ebike_PowerConsumptionCalculator
 from e_scooter import Escooter_PowerConsumptionCalculator
@@ -420,43 +422,42 @@ class Optimization:
             G.add_edge(edge_info['from_edge'], edge_info['to_edge'])
         return G
 
-    def find_all_paths(self, graph, start_node, end_node):
-        all_paths = list(nx.all_simple_paths(graph, start_node, end_node))
-        return all_paths
+    def build_graph(self):
+        graph = {}
+        for connection_id, edge_data in self.edges.items():
+            from_node = edge_data['from_edge']
+            to_node = edge_data['to_edge']
+            if from_node not in graph:
+                graph[from_node] = {}
+            if to_node not in graph:
+                graph[to_node] = {}
+            graph[from_node][to_node] = edge_data['mode_time']
+        return graph
 
+    def dijkstra(self, graph, start_edge, mode):
+        # Initialize distances with infinity and set the start node distance to 0
+        distances = defaultdict(lambda: float('inf'))
+        distances[start_edge] = 0
+        # Priority queue to store (distance, node)
+        pq = [(0, start_edge)]
 
-    # def find_all_routes(self, start_edge, end_edge):
-    #     stack = [(start_edge, [start_edge])]
-    #     all_paths = []
-    #
-    #     # Initialize tqdm progress bar
-    #     pbar = tqdm(total=len(self.edges), desc="Finding routes")
-    #
-    #     while stack:
-    #         current_edge, path = stack.pop()
-    #
-    #         # Update progress bar
-    #         pbar.update(1)
-    #
-    #         if current_edge == end_edge:
-    #             print(path)
-    #             all_paths.append(path)
-    #             continue
-    #
-    #         for edge_info in self.edges.values():
-    #             if edge_info['from_edge'] == current_edge:
-    #                 next_edge = edge_info['to_edge']
-    #                 if next_edge not in path:
-    #                     new_path = path + [next_edge]
-    #                     stack.append((next_edge, new_path))
-    #
-    #     pbar.close()
-    #     return all_paths
-    #
-    def find_all_routes_between(self, start_edge, end_edge):
-        graph = self.create_graph_from_edges()
-        all_paths = self.find_all_paths(graph, start_edge, end_edge)
-        return self.find_all_routes(start_edge, end_edge)
+        while pq:
+            current_distance, current_node = heappop(pq)
+
+            if current_distance > distances[current_node]:
+                continue
+
+            for neighbor in graph[current_node]:
+                # Access the time for the current mode
+                time = graph[current_node][neighbor].get(mode, {}).get('to_time', float('inf'))
+                distance = current_distance + time
+
+                if distance < distances[neighbor]:
+                    distances[neighbor] = distance
+                    heappush(pq, (distance, neighbor))
+
+        return distances
+
     # def run_aco_algorithm(self, start_edge, destination_edge, number_of_ants, number_of_iterations, mode='walking'):
     #     if start_edge not in self.unique_edges:
     #         print(f"There's no edge {start_edge} in this map.")
