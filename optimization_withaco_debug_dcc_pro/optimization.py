@@ -422,41 +422,104 @@ class Optimization:
             G.add_edge(edge_info['from_edge'], edge_info['to_edge'])
         return G
 
+    from collections import defaultdict
+
     def build_graph(self):
-        graph = {}
-        for connection_id, edge_data in self.edges.items():
-            from_node = edge_data['from_edge']
-            to_node = edge_data['to_edge']
-            if from_node not in graph:
-                graph[from_node] = {}
-            if to_node not in graph:
-                graph[to_node] = {}
-            graph[from_node][to_node] = edge_data['mode_time']
+        graph = defaultdict(lambda: defaultdict(dict))
+        for connection_id, edge_info in self.edges.items():
+            from_node = edge_info['from_edge']
+            to_node = edge_info['to_edge']
+            for mode, times in edge_info['mode_time'].items():
+                # Directly store the travel time for each mode between from_node and to_node
+                graph[from_node][to_node][mode] = times['from_time']
         return graph
 
-    def dijkstra(self, graph, start_edge, mode):
-        # Initialize distances with infinity and set the start node distance to 0
-        distances = defaultdict(lambda: float('inf'))
-        distances[start_edge] = 0
-        # Priority queue to store (distance, node)
-        pq = [(0, start_edge)]
+    def find_station_nodes(self):
+        station_nodes = set()
+        for edge_info in self.edges.values():
+            if edge_info['has_station']:  # Conceptual check
+                station_nodes.add(edge_info['from_edge'])
+                station_nodes.add(edge_info['to_edge'])
+        return station_nodes
 
-        while pq:
-            current_distance, current_node = heappop(pq)
+    from heapq import heappop, heappush
+    from collections import defaultdict
 
-            if current_distance > distances[current_node]:
-                continue
+    def dijkstra_for_all_modes_with_availability(self, station_nodes, mode_availability):
+        # Initialize distances for each mode and each start station node
+        all_modes_distances = {mode: defaultdict(lambda: float('inf')) for mode in self.modes}
+        # Dictionary to store the paths
+        all_paths = {mode: defaultdict(list) for mode in self.modes}
 
-            for neighbor in graph[current_node]:
-                # Access the time for the current mode
-                time = graph[current_node][neighbor].get(mode, {}).get('to_time', float('inf'))
-                distance = current_distance + time
+        for start in station_nodes:
+            available_modes_at_start = mode_availability[start]
+            for mode in available_modes_at_start:
+                # Initialize priority queue for current mode, considering only available modes at the start
+                pq = [(0, start, [start])]  # (distance, current_node, path)
+                all_modes_distances[mode][start] = 0
 
-                if distance < distances[neighbor]:
-                    distances[neighbor] = distance
-                    heappush(pq, (distance, neighbor))
+                while pq:
+                    current_distance, current_node, path = heappop(pq)
 
-        return distances
+                    if current_distance > all_modes_distances[mode][current_node]:
+                        continue
+
+                    for neighbor, modes in self.graph[current_node].items():
+                        if mode in modes and neighbor in station_nodes:
+                            # Check if the mode is available at the neighbor station
+                            if mode in mode_availability[neighbor]:
+                                time = modes[mode]['from_time']
+                                new_distance = current_distance + time
+                                new_path = path + [neighbor]
+
+                                if new_distance < all_modes_distances[mode][neighbor]:
+                                    all_modes_distances[mode][neighbor] = new_distance
+                                    all_paths[mode][neighbor] = new_path
+                                    heappush(pq, (new_distance, neighbor, new_path))
+
+        # Filter results for station nodes
+        filtered_distances = {
+            mode: {
+                node: dist for node, dist in all_modes_distances[mode].items() if node in station_nodes
+            } for mode in self.modes
+        }
+        filtered_paths = {
+            mode: {
+                node: path for node, path in all_paths[mode].items() if node in station_nodes and node != start
+            } for mode in self.modes
+        }
+
+        return filtered_distances, filtered_paths
+
+    def calculate_all_pairs_shortest_path(self, graph, station_nodes):
+        all_pairs_distances = {}
+        for start in station_nodes:
+            all_pairs_distances[start] = self.dijkstra(graph, start)
+        return all_pairs_distances
+
+    # def dijkstra(self, graph, start_edge, mode):
+    #     # Initialize distances with infinity and set the start node distance to 0
+    #     distances = defaultdict(lambda: float('inf'))
+    #     distances[start_edge] = 0
+    #     # Priority queue to store (distance, node)
+    #     pq = [(0, start_edge)]
+    #
+    #     while pq:
+    #         current_distance, current_node = heappop(pq)
+    #
+    #         if current_distance > distances[current_node]:
+    #             continue
+    #
+    #         for neighbor in graph[current_node]:
+    #             # Access the time for the current mode
+    #             time = graph[current_node][neighbor].get(mode, {}).get('to_time', float('inf'))
+    #             distance = current_distance + time
+    #
+    #             if distance < distances[neighbor]:
+    #                 distances[neighbor] = distance
+    #                 heappush(pq, (distance, neighbor))
+    #
+    #     return distances
 
     # def run_aco_algorithm(self, start_edge, destination_edge, number_of_ants, number_of_iterations, mode='walking'):
     #     if start_edge not in self.unique_edges:
