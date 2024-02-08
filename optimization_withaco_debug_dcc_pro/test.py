@@ -21,8 +21,10 @@ class TestOptimization(unittest.TestCase):
         print("Initialize finished")
         # best_path = optimizer.run_aco_algorithm(self.source_edge, self.target_edge, self.ant_num, self.iteration,
         #                                         self.start_mode)
-        possible_paths = optimizer.find_all_routes_between(self.source_edge, self.target_edge)
-        print(possible_paths)
+        # possible_paths = optimizer.find_all_routes_between(self.source_edge, self.target_edge)
+        # print(possible_paths)
+        path = optimizer.calculate_mode_shortest_paths('e_bike_1')
+        print(path)
 
     def tearDown(self):
         pass

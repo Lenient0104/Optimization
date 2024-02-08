@@ -1,3 +1,4 @@
+import heapq
 import re
 import sqlite3
 import time
@@ -19,12 +20,14 @@ class Optimization:
     def __init__(self, net_xml_path, user, db_path):
         self.user = user
         self.unique_edges = []
+        self.connections = []
         self.net_xml_path = net_xml_path
         self.db_connection = sqlite3.connect(db_path)
 
         # Parse the XML file to get road and lane information
-        self.edges = self.parse_net_xml(net_xml_path)
+        self.edges, self.edge_map = self.parse_net_xml(net_xml_path)
         # Map time to lanes using the provided CSV file
+        self.edges_station = self.get_stations()
         self.map_speed()
         self.mode_time_cal()
         # Insert energy model
@@ -33,7 +36,7 @@ class Optimization:
         self.escooter_energymodel = Escooter_PowerConsumptionCalculator()
         # self.map_energy_to_lanes(60, 1)
         # self.map_station_availability()
-        self.edges_station = self.get_stations()
+
         self.initialize_pheromone_levels()
 
     def parse_net_xml(self, filepath):
@@ -50,7 +53,7 @@ class Optimization:
                 edge_detail_map[edge_id] = {
                     'length': float(lane.attrib['length']),
                     'speed_limit': float(lane.attrib['speed']),
-                    'shape': lane.attrib['shape']
+                    'shape': lane.attrib['shape'],
                 }
         end_time = time.time()  # End timing
         print(f"Finished information extraction from edges in {end_time - start_time:.2f} seconds.")
@@ -58,6 +61,7 @@ class Optimization:
         start_time = time.time()
         # Constructing edges from <connection> tags
         for conn in tqdm(root.findall('connection'), desc="Processing connections", mininterval=1.0):
+            pairs = []
             from_edge = conn.get('from')
             if from_edge.startswith(":") or re.match(pattern, from_edge) is not None:
                 break
@@ -66,8 +70,11 @@ class Optimization:
             to_edge = conn.get('to')
             if to_edge not in self.unique_edges:
                 self.unique_edges.append(to_edge)
-            # Forming a unique identifier for connection
+
             connection_id = f"{from_edge}->{to_edge}"
+            pairs.append(from_edge)
+            pairs.append(to_edge)
+            self.connections.append(pairs)
 
             # Using details from <edge> if available, else setting defaults
             details_from = edge_detail_map.get(from_edge, {'length': 0, 'speed_limit': 0})
@@ -100,10 +107,6 @@ class Optimization:
                     'e_car': {'from_energy': 0, 'to_energy': 0},
                     'e_scooter_1': {'from_energy': 0, 'to_energy': 0}
                 },
-                # 'station_availability': {
-                #     'from': {'e_bike_1': False, 'e_car': False, 'e_scooter_1': False, 'walking': True},
-                #     'to': {'e_bike_1': False, 'e_car': False, 'e_scooter_1': False, 'walking': True}
-                # },
                 'pheromone_levels': {
                     'e_bike_1': {'from': 0.1, 'to': 0.1},
                     'e_car': {'from': 0.1, 'to': 0.1},
@@ -114,7 +117,7 @@ class Optimization:
 
         end_time = time.time()  # End timing for the connections
         print(f"Finished constructing connections in {end_time - start_time:.2f} seconds.")
-        return edges
+        return edges, edge_detail_map
 
     def map_speed(self):
         for _, edge_data in tqdm(self.edges.items(), desc="Setting Speed Data"):
@@ -127,13 +130,16 @@ class Optimization:
 
     def mode_time_cal(self):
         for _, edge_data in tqdm(self.edges.items(), desc="Setting Time Data"):
-            edge_data['mode_time']['e_bike_1']['from_time'] = edge_data['from_length'] / edge_data['speed']['e_bike_1']['from_speed']
+            edge_data['mode_time']['e_bike_1']['from_time'] = edge_data['from_length'] / edge_data['speed']['e_bike_1'][
+                'from_speed']
             edge_data['mode_time']['e_bike_1']['to_time'] = edge_data['to_length'] / edge_data['speed']['e_bike_1'][
                 'to_speed']
-            edge_data['mode_time']['e_scooter_1']['from_time'] = edge_data['from_length'] / edge_data['speed']['e_scooter_1'][
-                'from_speed']
-            edge_data['mode_time']['e_scooter_1']['to_time'] = edge_data['to_length'] / edge_data['speed']['e_scooter_1'][
-                'to_speed']
+            edge_data['mode_time']['e_scooter_1']['from_time'] = edge_data['from_length'] / \
+                                                                 edge_data['speed']['e_scooter_1'][
+                                                                     'from_speed']
+            edge_data['mode_time']['e_scooter_1']['to_time'] = edge_data['to_length'] / \
+                                                               edge_data['speed']['e_scooter_1'][
+                                                                   'to_speed']
             edge_data['mode_time']['e_car']['from_time'] = edge_data['from_length'] / edge_data['speed']['e_car'][
                 'from_speed']
             edge_data['mode_time']['e_car']['to_time'] = edge_data['to_length'] / edge_data['speed']['e_car'][
@@ -143,172 +149,58 @@ class Optimization:
             edge_data['mode_time']['walking']['to_time'] = edge_data['to_length'] / edge_data['speed']['walking'][
                 'speed']
 
-    # def mode_time_calculation(self):
-    #     # speed limit:
-    #     # e_scooter_1 = 6.9, e_bike_1 = 6.9, e_car = 41.7 m/s
-    #     cursor = self.db_connection.cursor()
-    #     query = """
-    #             SELECT EdgeID, Speed
-    #             FROM EdgeSpeed
-    #             WHERE TimeStep = (SELECT MAX(TimeStep) FROM EdgeSpeed)
-    #             """
-    #     cursor.execute(query)
-    #     latest_speed_data = cursor.fetchall()
-    #     # Create a dictionary for fast lookup of mean_speed based on edge_id
-    #     speed_lookup = {edge_id: speed for edge_id, speed in latest_speed_data}
-    #
-    #     edges = self.edges
-    #
-    #     # Update the speed in the edges dictionary
-    #     for connection_id, edge_data in self.edges.items():
-    #         from_edge = int(edge_data['from_edge'])
-    #         to_edge = int(edge_data['to_edge'])
-    #         from_length = edge_data['from_length']
-    #         to_length = edge_data['to_length']
-    #
-    #         if from_edge in speed_lookup:
-    #             edges[connection_id]['from_average_speed'] = speed_lookup[from_edge]
-    #             from_average_speed = edges[connection_id]['from_average_speed']
-    #             if from_average_speed < 6.9:
-    #                 edges[connection_id]['mode_time']['e_bike_1']['from_time'] = from_length / from_average_speed
-    #                 edges[connection_id]['mode_time']['e_scooter_1']['from_time'] = from_length / from_average_speed
-    #                 edges[connection_id]['mode_time']['e_car']['from_time'] = from_length / from_average_speed
-    #                 edges[connection_id]['mode_time']['walking']['from_time'] = from_length / 1.4
-    #
-    #                 edges[connection_id]['speed']['e_bike_1']['from_speed'] = from_average_speed
-    #                 edges[connection_id]['speed']['e_scooter_1']['from_speed'] = from_average_speed
-    #                 edges[connection_id]['speed']['e_car']['from_speed'] = from_average_speed
-    #
-    #             if 6.9 <= from_average_speed < 41.7:
-    #                 edges[connection_id]['mode_time']['e_bike_1']['from_time'] = from_length / 6.9
-    #                 edges[connection_id]['mode_time']['e_scooter_1']['from_time'] = from_length / 6.9
-    #                 edges[connection_id]['mode_time']['e_car']['from_time'] = from_length / from_average_speed
-    #                 edges[connection_id]['mode_time']['walking']['from_time'] = from_length / 1.4
-    #
-    #                 edges[connection_id]['speed']['e_bike_1']['from_speed'] = 6.9
-    #                 edges[connection_id]['speed']['e_scooter_1']['from_speed'] = 6.9
-    #                 edges[connection_id]['speed']['e_car']['from_speed'] = from_average_speed
-    #             else:
-    #                 edges[connection_id]['mode_time']['e_bike_1']['from_time'] = from_length / 6.9
-    #                 edges[connection_id]['mode_time']['e_scooter_1']['from_time'] = from_length / 6.9
-    #                 edges[connection_id]['mode_time']['e_car']['from_time'] = from_length / 41.7
-    #                 edges[connection_id]['mode_time']['walking']['from_time'] = from_length / 1.4
-    #
-    #                 edges[connection_id]['speed']['e_bike_1']['from_speed'] = 6.9
-    #                 edges[connection_id]['speed']['e_scooter_1']['from_speed'] = 6.9
-    #                 edges[connection_id]['speed']['e_car']['from_speed'] = 41.7
-    #
-    #         if to_edge in speed_lookup:
-    #             edges[connection_id]['to_average_speed'] = speed_lookup[to_edge]
-    #             to_average_speed = edges[connection_id]['to_average_speed']
-    #             if to_average_speed < 6.9:
-    #                 edges[connection_id]['mode_time']['e_bike_1']['to_time'] = to_length / to_average_speed
-    #                 edges[connection_id]['mode_time']['e_scooter_1']['to_time'] = to_length / to_average_speed
-    #                 edges[connection_id]['mode_time']['e_car']['to_time'] = to_length / to_average_speed
-    #                 edges[connection_id]['mode_time']['walking']['to_time'] = from_length / 1.4
-    #
-    #                 edges[connection_id]['speed']['e_bike_1']['to_speed'] = to_average_speed
-    #                 edges[connection_id]['speed']['e_scooter_1']['to_speed'] = to_average_speed
-    #                 edges[connection_id]['speed']['e_car']['to_speed'] = to_average_speed
-    #             if 6.9 <= to_average_speed < 41.7:
-    #                 edges[connection_id]['mode_time']['e_bike_1']['to_time'] = to_length / 6.9
-    #                 edges[connection_id]['mode_time']['e_scooter_1']['to_time'] = to_length / 6.9
-    #                 edges[connection_id]['mode_time']['e_car']['to_time'] = to_length / to_average_speed
-    #                 edges[connection_id]['mode_time']['walking']['to_time'] = from_length / 1.4
-    #
-    #                 edges[connection_id]['speed']['e_bike_1']['to_speed'] = 6.9
-    #                 edges[connection_id]['speed']['e_scooter_1']['to_speed'] = 6.9
-    #                 edges[connection_id]['speed']['e_car']['to_speed'] = to_average_speed
-    #
-    #             else:
-    #                 edges[connection_id]['mode_time']['e_bike_1']['to_time'] = to_length / 6.9
-    #                 edges[connection_id]['mode_time']['e_scooter_1']['to_time'] = to_length / 6.9
-    #                 edges[connection_id]['mode_time']['e_car']['to_time'] = to_length / 41.7
-    #                 edges[connection_id]['mode_time']['walking']['to_time'] = from_length / 1.4
-    #
-    #                 edges[connection_id]['speed']['e_bike_1']['to_speed'] = 6.9
-    #                 edges[connection_id]['speed']['e_scooter_1']['to_speed'] = 6.9
-    #                 edges[connection_id]['speed']['e_car']['to_speed'] = 41.7
-
-    # def map_energy_to_lanes(self, user_weight, user_pal):
-    #     edges = self.edges
-    #     for connection_id, edge_data in tqdm(edges.items(), desc="Processing edges"):
-    #         # Speed limits for different modes
-    #         ebike_speed_limit = 6.9  # in m/s
-    #         ecar_speed_limit = 41.7  # in m/s
-    #         escooter_speed_limit = 6.9  # in m/s
-    #         walking_speed = 1.4  # in m/s
-    #
-    #         # Retrieve the speeds for each mode from the edge data
-    #         from_ebike_speed = min(edge_data['speed']['e_bike_1']['from_speed'], ebike_speed_limit)
-    #         to_ebike_speed = min(edge_data['speed']['e_bike_1']['to_speed'], ebike_speed_limit)
-    #         from_ecar_speed = min(edge_data['speed']['e_car']['from_speed'], ecar_speed_limit)
-    #         to_ecar_speed = min(edge_data['speed']['e_car']['to_speed'], ecar_speed_limit)
-    #         from_escooter_speed = min(edge_data['speed']['e_scooter_1']['from_speed'], escooter_speed_limit)
-    #         to_escooter_speed = min(edge_data['speed']['e_scooter_1']['to_speed'], escooter_speed_limit)
-    #
-    #         # Calculate energy consumption for e_bike_1, e_car, e_scooter_1
-    #         edge_data['energy_consumption']['e_bike_1']['from_energy'] = self.ebike_energymodel.calculate(
-    #             from_ebike_speed / 1000, user_weight, 1, user_pal) * edge_data['mode_time']['e_bike_1'][
-    #                                                                          'from_time'] * 2.77778e-4
-    #
-    #         edge_data['energy_consumption']['e_bike_1']['to_energy'] = self.ebike_energymodel.calculate(
-    #             to_ebike_speed / 1000,
-    #             user_weight, 1,
-    #             user_pal) * edge_data['mode_time']['e_bike_1']['to_time'] * 2.77778e-4
-    #
-    #         edge_data['energy_consumption']['e_car']['from_energy'] = self.ecar_energymodel.calculate_energy_loss(
-    #             from_ecar_speed) * edge_data['from_length'] / 1000000 * edge_data['mode_time']['e_car'][
-    #                                                                       'from_time'] / 3600  # wh
-    #         edge_data['energy_consumption']['e_car']['to_energy'] = self.ecar_energymodel.calculate_energy_loss(
-    #             to_ecar_speed) * edge_data['to_length'] / 1000000 * edge_data['mode_time']['e_car']['to_time'] / 3600
-    #
-    #         # edge_data['energy_consumption']['e_car']['from_energy'] = 1
-    #         # edge_data['energy_consumption']['e_car']['to_energy'] = 1
-    #
-    #         edge_data['energy_consumption']['e_scooter_1']['from_energy'] = self.escooter_energymodel.calculate(
-    #             from_escooter_speed / 1000, user_weight, 1) * edge_data['mode_time']['e_scooter_1'][
-    #                                                                             'from_time'] * 2.77778e-4
-    #         edge_data['energy_consumption']['e_scooter_1']['to_energy'] = self.escooter_energymodel.calculate(
-    #             to_escooter_speed / 1000, user_weight, 1) * edge_data['mode_time']['e_scooter_1'][
-    #                                                                           'to_time'] * 2.77778e-4
-
     # Define a function to generate random stations for an edge
-    def generate_random_stations(self):
-        # Initialize a list of stations with 'walking' station
-        stations = ['walking']
-        station_types = ['e_bike_1', 'e_scooter_1', 'e_car']
-
-        # Randomly decide whether to add other station types
-        for station_type in station_types:
-            if random.choice([True, False]):
-                stations.append(station_type)
-
-        return stations
+    # def generate_random_stations(self):
+    #     # Initialize a list of stations with 'walking' station
+    #     stations = ['walking']
+    #     station_types = ['e_bike_1', 'e_scooter_1', 'e_car']
+    #
+    #     # Randomly decide whether to add other station types
+    #     for station_type in station_types:
+    #         if random.choice([True, False]):
+    #             stations.append(station_type)
+    #     print(stations)
+    #     return stations
+    #
+    # def get_stations(self):
+    #     # Create a dictionary to store stations for each edge
+    #     edge_stations = {}
+    #
+    #     # Randomly select up to 10 edges if there are more than 10, else select all
+    #     selected_edges = random.sample(self.unique_edges, min(len(self.unique_edges), 10))
+    #
+    #     # Initialize all edges with just 'walking' station
+    #     for edge_id in self.unique_edges:
+    #         edge_stations[edge_id] = ['walking']
+    #
+    #     # Generate stations for the selected edges
+    #     for edge_id in selected_edges:
+    #         edge_stations[edge_id] = self.generate_random_stations()
+    #
+    #     return edge_stations
 
     def get_stations(self):
-        # Create a dictionary to store stations for each edge
-        edge_stations = {}
-        # Generate stations for each edge
-        for edge_id in self.unique_edges:
-            edge_stations[edge_id] = self.generate_random_stations()
+        # Ensure all edges initially have just a 'walking' station
+        edge_stations = {edge_id: ['walking'] for edge_id in self.unique_edges}
+
+        # Determine the number of edges to assign e-mobility stations to (up to 10)
+        num_edges_to_assign = min(len(self.unique_edges), 10)
+
+        # Select random edges to assign e-mobility stations
+        edges_to_assign = random.sample(self.unique_edges, num_edges_to_assign)
+
+        # Assign at least one e-mobility station type to each selected edge
+        for edge_id in edges_to_assign:
+            # Choose at least one e-mobility station type for this edge
+            e_mobility_stations = random.sample(['e_bike_1', 'e_scooter_1', 'e_car'], k=1)
+            # There's an opportunity to add more e-mobility stations randomly
+            for station in ['e_bike_1', 'e_scooter_1', 'e_car']:
+                if station not in e_mobility_stations and random.choice([True, False]):
+                    e_mobility_stations.append(station)
+            # Assign the selected e-mobility stations to this edge
+            edge_stations[edge_id] = ['walking'] + e_mobility_stations
 
         return edge_stations
-
-    # def map_station_availability(self):
-    #     # static information
-    #     cursor = self.db_connection.cursor()
-    #     query = "SELECT StationEdgeID, StationType FROM StationLocation"
-    #     cursor.execute(query)
-    #     station_data = cursor.fetchall()
-    #     print(station_data)
-    #
-    #     for station_edge_id, station_type in station_data:
-    #         for connection_id, edge_data in self.edges.items():
-    #             if edge_data['from_edge'] == str(station_edge_id):
-    #                 self.edges[connection_id]['station_availability']['from'][station_type] = True
-    #             if edge_data['to_edge'] == str(station_edge_id):
-    #                 self.edges[connection_id]['station_availability']['to'][station_type] = True
 
     def initialize_pheromone_levels(self):
         for connection_id in self.edges:
@@ -321,40 +213,6 @@ class Optimization:
                 'walking': {'from': pheromone_init_value, 'to': pheromone_init_value}
             }
         # print(self.convert(self.edges)['-1'])
-
-    def convert(self, edges):
-
-        new_structure = {}
-        for connection_id, edge_info in edges.items():
-            # Extract 'from' and 'to' station names
-            from_edge = edge_info['from_edge']
-            to_edge = edge_info['to_edge']
-
-            new_structure[from_edge] = {}
-
-            # Iterate through each mode of transport
-            for mode in edge_info['mode_time']:
-                # Calculate the total time cost for each mode
-                from_time = edge_info['mode_time'][mode]['from_time']
-                to_time = edge_info['mode_time'][mode]['to_time']
-                total_time = from_time + to_time
-
-                # Calculate the total energy cost for each mode
-                if mode in edge_info['energy_consumption']:
-                    from_energy = edge_info['energy_consumption'][mode]['from_energy']
-                    to_energy = edge_info['energy_consumption'][mode]['to_energy']
-                    total_energy = from_energy + to_energy
-                else:
-                    total_energy = 0  # Default to 0 if the mode is not in energy_consumption
-
-                # Initialize the mode of transport for the station if not already present
-                if mode not in new_structure[from_edge]:
-                    new_structure[from_edge][mode] = []
-
-                # Append the new tuple
-                new_structure[from_edge][mode].append((to_edge, mode, total_energy, total_time))
-
-        return new_structure
 
     def check_edge_existence(self, edge):
         if edge in self.unique_edges:
@@ -412,186 +270,107 @@ class Optimization:
         # Higher deposit for faster paths
         return 1 / path_cost  # Example function, adjust as needed
 
-    # def calculate_pheromone(self, paths):
-    #     pheromone = {}
-    #     for path in paths:
-
-    def create_graph_from_edges(self):
+    def build_graph(self):
         G = nx.DiGraph()
-        for connection_id, edge_info in self.edges.items():
-            G.add_edge(edge_info['from_edge'], edge_info['to_edge'])
+        edges = self.unique_edges
+        for edge in edges:
+            G.add_node(edge, length=self.edge_map[edge]['length'])
+        # Add edges to the graph with weights
+        for connection in self.connections:
+            G.add_edge(connection[0], connection[1], travel_times={
+                'e_bike_1': 10,
+                'e_car': 5,
+                'e_scooter_1': 8,
+                'walking': 20
+            })
         return G
 
-    from collections import defaultdict
+    def shortest_path_for_mode(self, source, target, mode):
+        G = self.build_graph()
 
-    def build_graph(self):
-        graph = defaultdict(lambda: defaultdict(dict))
-        for connection_id, edge_info in self.edges.items():
-            from_node = edge_info['from_edge']
-            to_node = edge_info['to_edge']
-            for mode, times in edge_info['mode_time'].items():
-                # Directly store the travel time for each mode between from_node and to_node
-                graph[from_node][to_node][mode] = times['from_time']
-        return graph
+        def mode_weight(u, v, d):
+            return d['travel_times'].get(mode, float('inf'))
 
-    def find_station_nodes(self):
-        station_nodes = set()
-        for edge_info in self.edges.values():
-            if edge_info['has_station']:  # Conceptual check
-                station_nodes.add(edge_info['from_edge'])
-                station_nodes.add(edge_info['to_edge'])
-        return station_nodes
+        path = nx.shortest_path(G, source, target, weight=mode_weight)
+        return path
 
-    from heapq import heappop, heappush
-    from collections import defaultdict
-
-    def dijkstra_for_all_modes_with_availability(self, station_nodes, mode_availability):
-        # Initialize distances for each mode and each start station node
-        all_modes_distances = {mode: defaultdict(lambda: float('inf')) for mode in self.modes}
-        # Dictionary to store the paths
-        all_paths = {mode: defaultdict(list) for mode in self.modes}
-
-        for start in station_nodes:
-            available_modes_at_start = mode_availability[start]
-            for mode in available_modes_at_start:
-                # Initialize priority queue for current mode, considering only available modes at the start
-                pq = [(0, start, [start])]  # (distance, current_node, path)
-                all_modes_distances[mode][start] = 0
-
-                while pq:
-                    current_distance, current_node, path = heappop(pq)
-
-                    if current_distance > all_modes_distances[mode][current_node]:
-                        continue
-
-                    for neighbor, modes in self.graph[current_node].items():
-                        if mode in modes and neighbor in station_nodes:
-                            # Check if the mode is available at the neighbor station
-                            if mode in mode_availability[neighbor]:
-                                time = modes[mode]['from_time']
-                                new_distance = current_distance + time
-                                new_path = path + [neighbor]
-
-                                if new_distance < all_modes_distances[mode][neighbor]:
-                                    all_modes_distances[mode][neighbor] = new_distance
-                                    all_paths[mode][neighbor] = new_path
-                                    heappush(pq, (new_distance, neighbor, new_path))
-
-        # Filter results for station nodes
-        filtered_distances = {
-            mode: {
-                node: dist for node, dist in all_modes_distances[mode].items() if node in station_nodes
-            } for mode in self.modes
-        }
-        filtered_paths = {
-            mode: {
-                node: path for node, path in all_paths[mode].items() if node in station_nodes and node != start
-            } for mode in self.modes
+    def classify_stations(self):
+        station_edges = self.get_stations()  # Retrieve the current station assignments for each edge
+        mode_stations = {
+            'e_bike_1': [],
+            'e_scooter_1': [],
+            'e_car': []
         }
 
-        return filtered_distances, filtered_paths
+        # Iterate through each edge and its assigned stations
+        for edge_id, stations in station_edges.items():
+            # Check for the presence of each station type and classify the edge accordingly
+            if 'e_bike_1' in stations:
+                mode_stations['e_bike_1'].append(edge_id)
+            if 'e_scooter_1' in stations:
+                mode_stations['e_scooter_1'].append(edge_id)
+            if 'e_car' in stations:
+                mode_stations['e_car'].append(edge_id)
 
-    def calculate_all_pairs_shortest_path(self, graph, station_nodes):
-        all_pairs_distances = {}
-        for start in station_nodes:
-            all_pairs_distances[start] = self.dijkstra(graph, start)
-        return all_pairs_distances
+        # Optionally, print the classification result for debugging
+        print(mode_stations)
+        return mode_stations
 
-    # def dijkstra(self, graph, start_edge, mode):
-    #     # Initialize distances with infinity and set the start node distance to 0
-    #     distances = defaultdict(lambda: float('inf'))
-    #     distances[start_edge] = 0
-    #     # Priority queue to store (distance, node)
-    #     pq = [(0, start_edge)]
+    # def build_e_bike_subgraph(self, G):
+    #     # Initialize a new directed graph for e-bike stations
+    #     e_bike_G = nx.DiGraph()
     #
-    #     while pq:
-    #         current_distance, current_node = heappop(pq)
+    #     # Iterate over all edges in your original graph
+    #     for u, v, data in G.edges(data=True):
+    #         if 'e_bike_1' in data['travel_times']:
+    #             # Add both the nodes and the edge to the e-bike graph if not already added
+    #             if not e_bike_G.has_node(u):
+    #                 e_bike_G.add_node(u)
+    #             if not e_bike_G.has_node(v):
+    #                 e_bike_G.add_node(v)
+    #             # Add the edge with the e-bike travel time
+    #             e_bike_G.add_edge(u, v, weight=data['travel_times']['e_bike_1'])
     #
-    #         if current_distance > distances[current_node]:
-    #             continue
-    #
-    #         for neighbor in graph[current_node]:
-    #             # Access the time for the current mode
-    #             time = graph[current_node][neighbor].get(mode, {}).get('to_time', float('inf'))
-    #             distance = current_distance + time
-    #
-    #             if distance < distances[neighbor]:
-    #                 distances[neighbor] = distance
-    #                 heappush(pq, (distance, neighbor))
-    #
-    #     return distances
+    #     return e_bike_G
 
-    # def run_aco_algorithm(self, start_edge, destination_edge, number_of_ants, number_of_iterations, mode='walking'):
-    #     if start_edge not in self.unique_edges:
-    #         print(f"There's no edge {start_edge} in this map.")
-    #         return
-    #     if destination_edge not in self.unique_edges:
-    #         print(f"There's no edge {destination_edge} in this map.")
-    #         return
+    # def calculate_all_e_bike_shortest_paths(self, G):
+    #     # Calculate shortest paths for all pairs of nodes in the e-bike subgraph
+    #     all_pairs_shortest_path = dict(nx.all_pairs_dijkstra_path(G, weight='weight'))
+    #     return all_pairs_shortest_path
     #
-    #     log_interval = 1
-    #     # Initialize ants with specified start and destination locations
-    #     # ants = [Ant(start_edge, destination_edge, self.db_connection, self.edges, mode) for _ in
-    #     #         range(number_of_ants)]
+    # def calculate_e_bike_paths(self):
+    #     # Build the original graph with all modes and connections
+    #     G = self.build_graph()
     #
-    #     best_time_cost = float('inf')
-    #     ant_index = 1
-    #     ants = []
-    #     total_pheromones = {}
-    #     pheromones = []
-    #     max_pheromone = 0
-    #     time_costs = []
-    #     time_cost_counts = {}
+    #     # Build the e-bike subgraph
+    #     e_bike_G = self.build_e_bike_subgraph(G)
     #
-    #     # print(self.edges_station)
-    #     for ant_num in range(number_of_ants):
-    #         ant = Ant(start_edge, destination_edge, self.db_connection, self.edges, self.edges_station, ant_index, mode)
-    #         print("ant", ant_index)
-    #         move_count = 0
-    #         while ant.path[-1][0] != destination_edge and ant.stop is False:
-    #             # and ant.total_time_cost <= best_time_cost
-    #             ant.move()
-    #             if len(ant.path) > 2 and (ant.path[-1][0] == ant.path[-2][0]):
-    #                 break
-    #             move_count += 1
-    #             if move_count > 1000:
-    #                 # print("Move limit reached, breaking out of loop.")
-    #                 break
-    #         # time_costs.append(ant.total_time_cost)
-    #         print(ant.path)
-    #         if ant.path[-1][0] == destination_edge:
-    #             # paths.append(ant.path)
-    #             print(ant.path)
-    #             # print("time cost:", ant.total_time_cost)
-    #
-    #             if ant.total_time_cost <= best_time_cost:
-    #                 # print("curren best time cost", best_time_cost)
-    #                 # print("curren time cost", ant.total_time_cost)
-    #                 time_costs.append(ant.total_time_cost)
-    #                 ants.append(ant)
-    #                 best_time_cost = ant.total_time_cost
-    #                 total_pheromone = self.update_pheromones(ant)
-    #                 total_pheromones[ant] = total_pheromone
-    #                 # print("updated")
-    #             # Count the occurrence of the time cost
-    #             if ant.total_time_cost in time_cost_counts:
-    #                 time_cost_counts[ant.total_time_cost] += 1
-    #             else:
-    #                 time_cost_counts[ant.total_time_cost] = 1
-    #         ant_index = ant_index + 1
-    #
-    #     current_best_ant = self.find_best_path(ants, destination_edge, total_pheromones)  # based on pheromone level
-    #     best_path = current_best_ant.path
-    #     best_time_cost = current_best_ant.total_time_cost
-    #     best_distance_cost = current_best_ant.path_length
-    #
-    #     # if (iteration + 1) % log_interval == 0 or iteration == number_of_iterations - 1: print( f"Iteration {
-    #     # iteration + 1}/{number_of_iterations}: Best Path = {best_path}, Time Cost = {best_time_cost},
-    #     # Total Distance = {best_distance_cost}")
-    #     if best_path is None:
-    #         print("There's no route from start to destination.")
-    #         return
-    #     print(
-    #         f"Best Path after all iterations: Best Path = {best_path}, Time Cost = {best_time_cost}, Total Distance = {best_distance_cost}")
-    #     self.visualization(time_costs, number_of_ants)
-    #     return best_path
+    #     # Calculate and return all e-bike shortest paths
+    #     return self.calculate_all_e_bike_shortest_paths(e_bike_G)
+
+    def calculate_mode_shortest_paths(self, mode):
+        # Ensure the graph is built with all the necessary data
+        G = self.build_graph()
+
+        # Assuming you have a method or a data structure that gives you stations for the mode
+        mode_stations = self.classify_stations()[mode]
+
+        # Initialize a structure to hold the shortest paths
+        shortest_paths = {}
+
+        # Calculate shortest paths between all pairs of mode-specific stations
+        for source in mode_stations:
+            for target in mode_stations:
+                if source != target:  # Avoid calculating path to itself
+                    try:
+                        path = self.shortest_path_for_mode(source, target, mode)
+                        shortest_paths[(source, target)] = path
+                    except nx.NetworkXNoPath:
+                        print(f"No path found from {source} to {target} for mode {mode}.")
+
+        return shortest_paths
+
+
+
+
+
