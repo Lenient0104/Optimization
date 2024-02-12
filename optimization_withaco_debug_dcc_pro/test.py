@@ -23,7 +23,7 @@ class TestOptimization(unittest.TestCase):
         #                                         self.start_mode)
         # possible_paths = optimizer.find_all_routes_between(self.source_edge, self.target_edge)
         # print(possible_paths)
-        path = optimizer.calculate_mode_shortest_paths('e_bike_1')
+        path = optimizer.pre_computation(self.source_edge, self.target_edge)
         print(path)
 
     def tearDown(self):

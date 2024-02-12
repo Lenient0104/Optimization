@@ -9,6 +9,7 @@ from aco import Ant
 import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from pyvis.network import Network
 from heapq import heappush, heappop
 from collections import defaultdict
 from e_car import ECar_EnergyConsumptionModel
@@ -38,6 +39,7 @@ class Optimization:
         # self.map_station_availability()
 
         self.initialize_pheromone_levels()
+        self.G = self.build_graph()
 
     def parse_net_xml(self, filepath):
         pattern = r"^[A-Za-z]+"
@@ -273,8 +275,12 @@ class Optimization:
     def build_graph(self):
         G = nx.DiGraph()
         edges = self.unique_edges
+        flag = '3789374#3' in edges
+        flag_4 = '41592114' in edges
         for edge in edges:
             G.add_node(edge, length=self.edge_map[edge]['length'])
+        flag_1 = G.has_node('3789374#3')
+        flag_2 = G.has_node('41592114')
         # Add edges to the graph with weights
         for connection in self.connections:
             G.add_edge(connection[0], connection[1], travel_times={
@@ -283,10 +289,11 @@ class Optimization:
                 'e_scooter_1': 8,
                 'walking': 20
             })
+        print(G.number_of_nodes(), G.number_of_edges())
         return G
 
     def shortest_path_for_mode(self, source, target, mode):
-        G = self.build_graph()
+        G = self.G
 
         def mode_weight(u, v, d):
             return d['travel_times'].get(mode, float('inf'))
@@ -295,7 +302,7 @@ class Optimization:
         return path
 
     def classify_stations(self):
-        station_edges = self.get_stations()  # Retrieve the current station assignments for each edge
+        station_edges = self.edges_station  # Retrieve the current station assignments for each edge
         mode_stations = {
             'e_bike_1': [],
             'e_scooter_1': [],
@@ -313,62 +320,213 @@ class Optimization:
                 mode_stations['e_car'].append(edge_id)
 
         # Optionally, print the classification result for debugging
-        print(mode_stations)
+        # print(mode_stations)
         return mode_stations
 
-    # def build_e_bike_subgraph(self, G):
-    #     # Initialize a new directed graph for e-bike stations
-    #     e_bike_G = nx.DiGraph()
-    #
-    #     # Iterate over all edges in your original graph
-    #     for u, v, data in G.edges(data=True):
-    #         if 'e_bike_1' in data['travel_times']:
-    #             # Add both the nodes and the edge to the e-bike graph if not already added
-    #             if not e_bike_G.has_node(u):
-    #                 e_bike_G.add_node(u)
-    #             if not e_bike_G.has_node(v):
-    #                 e_bike_G.add_node(v)
-    #             # Add the edge with the e-bike travel time
-    #             e_bike_G.add_edge(u, v, weight=data['travel_times']['e_bike_1'])
-    #
-    #     return e_bike_G
+    def calculate_all_modes_shortest_paths(self):
+        G = self.build_graph()  # Ensure this graph includes travel times correctly set up for each edge
 
-    # def calculate_all_e_bike_shortest_paths(self, G):
-    #     # Calculate shortest paths for all pairs of nodes in the e-bike subgraph
-    #     all_pairs_shortest_path = dict(nx.all_pairs_dijkstra_path(G, weight='weight'))
-    #     return all_pairs_shortest_path
-    #
-    # def calculate_e_bike_paths(self):
-    #     # Build the original graph with all modes and connections
-    #     G = self.build_graph()
-    #
-    #     # Build the e-bike subgraph
-    #     e_bike_G = self.build_e_bike_subgraph(G)
-    #
-    #     # Calculate and return all e-bike shortest paths
-    #     return self.calculate_all_e_bike_shortest_paths(e_bike_G)
+        all_modes_shortest_paths = {}
+        station_classifications = self.classify_stations()
 
-    def calculate_mode_shortest_paths(self, mode):
-        # Ensure the graph is built with all the necessary data
-        G = self.build_graph()
+        for mode, mode_stations in station_classifications.items():
+            shortest_paths = {}
 
-        # Assuming you have a method or a data structure that gives you stations for the mode
-        mode_stations = self.classify_stations()[mode]
+            # Define a custom weight function that extracts the correct travel time for the mode
+            def weight(u, v, d):
+                return d['travel_times'].get(mode, float('inf'))  # Use a large default value if mode is not found
 
-        # Initialize a structure to hold the shortest paths
-        shortest_paths = {}
+            for source in mode_stations:
+                for target in mode_stations:
+                    if source != target:
+                        try:
+                            # Use the custom weight function for the shortest path calculation
+                            path = nx.shortest_path(G, source=source, target=target, weight=weight)
+                            # Calculate the total travel time for the path
+                            total_time = sum(
+                                G[path[i]][path[i + 1]]['travel_times'][mode] for i in range(len(path) - 1))
+                            shortest_paths[(source, target)] = (path, total_time)
+                        except nx.NetworkXNoPath:
+                            print(f"No path found from {source} to {target} for mode {mode}.")
 
-        # Calculate shortest paths between all pairs of mode-specific stations
-        for source in mode_stations:
-            for target in mode_stations:
-                if source != target:  # Avoid calculating path to itself
-                    try:
-                        path = self.shortest_path_for_mode(source, target, mode)
-                        shortest_paths[(source, target)] = path
-                    except nx.NetworkXNoPath:
-                        print(f"No path found from {source} to {target} for mode {mode}.")
+            all_modes_shortest_paths[mode] = shortest_paths
 
-        return shortest_paths
+        return all_modes_shortest_paths
+
+    def calculate_walking_paths_from_start(self, source, destination_edge):
+        G = self.G  # Ensure this graph includes walking times as weights
+
+        def walking_time(u, v, d):
+            return d['travel_times']['walking']
+
+        walking_paths = {}
+        station_classifications = self.classify_stations()
+        all_station_edges = set().union(*station_classifications.values(), {destination_edge})
+
+        for target in all_station_edges:
+            if source != target:  # Avoid calculating path to itself
+                try:
+                    path = nx.shortest_path(G, source=source, target=target, weight=walking_time)
+                    total_time = sum(G[path[i]][path[i + 1]]['travel_times']['walking'] for i in range(len(path) - 1))
+                    walking_paths[target] = (path, total_time)
+                except nx.NodeNotFound:
+                    print(f"Node not found from {source} to {target}")
+                except nx.NetworkXNoPath:
+                    print(f"No walking path found from {source} to {target}.")
+
+        return walking_paths
+
+    def calculate_walking_paths_to_destination(self, start_edge, destination_edge):
+        G = self.G  # Ensure this graph includes walking times as weights
+
+        # Extract the walking time for an edge
+        def walking_time(u, v, d):
+            return d['travel_times']['walking']
+
+        # Initialize a structure to hold the shortest paths and their total time costs
+        paths_to_destination = {}
+
+        # Get station classifications
+        station_classifications = self.classify_stations()
+
+        # Aggregate all unique station edges across all modes, including the start edge for completeness
+        all_station_edges = set().union(*station_classifications.values(), {start_edge})
+
+        # Calculate paths from all station edges and the start edge to the destination edge using walking mode
+        for source in all_station_edges:
+            if source != destination_edge:  # Exclude path from the destination to itself
+                try:
+                    path = nx.shortest_path(G, source=source, target=destination_edge, weight=walking_time)
+                    # Calculate the total walking time for the path
+                    total_time = sum(G[path[i]][path[i + 1]]['travel_times']['walking'] for i in range(len(path) - 1))
+                    paths_to_destination[source] = (path, total_time)
+                except nx.NodeNotFound:
+                    print(f"Node not found from {source} to {destination_edge}.")
+                except nx.NetworkXNoPath:
+                    print(f"No walking path found from {source} to {destination_edge}.")
+
+        return paths_to_destination
+
+    def build_all_modes_paths_graph_corrected(self, start_edge, destination_edge):
+        paths_graph = nx.DiGraph()
+
+        # Collect all station edges
+        station_classifications = self.classify_stations()
+        all_station_edges = set().union(*station_classifications.values(), {start_edge, destination_edge})
+        for node in all_station_edges:
+            paths_graph.add_node(node)
+
+        # Use the adjusted calculate_all_modes_shortest_paths that provides paths and total time costs
+        all_modes_shortest_paths = self.calculate_all_modes_shortest_paths()
+
+        # Add edges for each mode's paths with total time cost as weight
+        for mode, mode_shortest_paths in all_modes_shortest_paths.items():
+            for (source, target), (path, total_time) in mode_shortest_paths.items():
+                if {source, target}.issubset(all_station_edges):
+                    # Add a direct edge with total time cost as the weight
+                    paths_graph.add_edge(source, target, weight=total_time, mode=mode)
+
+        # Assume direct connections for walking paths with calculated total time costs
+        walking_paths_from_start = self.calculate_walking_paths_from_start(start_edge, destination_edge)
+        walking_paths_to_destination = self.calculate_walking_paths_to_destination(start_edge, destination_edge)
+
+        # Add walking paths from start to all station edges and the destination with total time as weight
+        for target, (path, total_time) in walking_paths_from_start.items():
+            if target in all_station_edges:
+                paths_graph.add_edge(start_edge, target, weight=total_time, mode='walking')
+
+        # Add walking paths from all station edges and the start to the destination with total time as weight
+        for source, (path, total_time) in walking_paths_to_destination.items():
+            if source in all_station_edges:
+                paths_graph.add_edge(source, destination_edge, weight=total_time, mode='walking')
+
+        return paths_graph
+
+    def visualize_paths_graph_interactive(self, paths_graph):
+        # Initialize the Network object with cdn_resources set to 'remote' for better compatibility
+        nt = Network(notebook=True, height="750px", width="100%", bgcolor="#222222", font_color="white",
+                     cdn_resources='remote')
+
+        # Define colors for different types of edges and nodes
+        station_color = 'lightblue'
+        start_end_color = 'green'
+        walking_edge_color = 'lightgray'
+        other_edge_color = 'blue'
+
+        # Add nodes and edges with attributes
+        for node in paths_graph.nodes:
+            if node.startswith("station_"):
+                nt.add_node(node, title=node, color=station_color)
+            elif node in paths_graph.graph['start_nodes'] or node in paths_graph.graph['end_nodes']:
+                nt.add_node(node, title=node, color=start_end_color)
+            else:
+                nt.add_node(node, title=node, color=other_edge_color)
+
+        for edge in paths_graph.edges(data=True):
+            src, dst, attr = edge
+            title = f"Mode: {attr['mode']}"
+            if attr['mode'] == 'walking':
+                nt.add_edge(src, dst, title=title, color=walking_edge_color)
+            else:
+                nt.add_edge(src, dst, title=title, color=other_edge_color)
+
+        # Configure the physics layout of the network
+        nt.set_options(options="""{
+          "physics": {
+            "barnesHut": {
+              "gravitationalConstant": -80000,
+              "centralGravity": 0.3,
+              "springLength": 100,
+              "springConstant": 0.04,
+              "damping": 0.09,
+              "avoidOverlap": 0.1
+            },
+            "minVelocity": 0.75
+          }
+        }""")
+
+        # Show the interactive plot, specifying the path where the HTML file will be saved
+        output_path = "paths_graph.html"
+        nt.show(output_path)
+        return output_path
+
+    def visualize_paths_graph(self, paths_graph):
+        plt.figure(figsize=(12, 12))  # Increase figure size
+        pos = nx.kamada_kawai_layout(paths_graph)  # Use a different layout
+
+        nx.draw_networkx_nodes(paths_graph, pos, node_size=500, node_color='lightblue')
+        nx.draw_networkx_edges(paths_graph, pos, edge_color='gray', arrows=True)
+        nx.draw_networkx_labels(paths_graph, pos, font_size=8)
+
+        edge_labels = nx.get_edge_attributes(paths_graph, 'mode')
+        nx.draw_networkx_edge_labels(paths_graph, pos, edge_labels=edge_labels, font_size=7)
+
+        plt.title("Shortest Paths Graph Visualization")
+        plt.axis('off')
+        plt.show()
+
+    def pre_computation(self, source, end):
+        print("The path between station edges:")
+        print(self.calculate_all_modes_shortest_paths())
+        print("The walking paths from start to stations and end edge:")
+        print(self.calculate_walking_paths_from_start(source, end))
+        print("The walking paths from start and stations to end:")
+        print(self.calculate_walking_paths_to_destination(source, end))
+        new_graph = self.build_all_modes_paths_graph_corrected(source, end)
+        self.visualize_paths_graph_interactive(new_graph)
+        self.visualize_paths_graph(new_graph)
+        print(new_graph.number_of_nodes(), new_graph.number_of_edges())
+
+
+
+
+
+
+
+
+
+
+
 
 
 
