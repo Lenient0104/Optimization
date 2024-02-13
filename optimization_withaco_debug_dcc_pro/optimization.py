@@ -513,8 +513,8 @@ class Optimization:
         print("The walking paths from start and stations to end:")
         print(self.calculate_walking_paths_to_destination(source, end))
         new_graph = self.build_all_modes_paths_graph_corrected(source, end)
-        self.visualize_paths_graph_interactive(new_graph)
-        self.visualize_paths_graph(new_graph)
+        # self.visualize_paths_graph_interactive(new_graph)
+        # self.visualize_paths_graph(new_graph)
         print(new_graph.number_of_nodes(), new_graph.number_of_edges())
 
 
