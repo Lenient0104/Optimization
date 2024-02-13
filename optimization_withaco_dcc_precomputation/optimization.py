@@ -15,6 +15,10 @@ from collections import defaultdict
 from e_car import ECar_EnergyConsumptionModel
 from e_bike import Ebike_PowerConsumptionCalculator
 from e_scooter import Escooter_PowerConsumptionCalculator
+import matplotlib
+matplotlib.use('TkAgg')  # Use Tkinter backend
+import matplotlib.pyplot as plt
+
 
 
 class Optimization:
@@ -204,6 +208,7 @@ class Optimization:
 
         return edge_stations
 
+    # need changing
     def initialize_pheromone_levels(self):
         for connection_id in self.edges:
             # Initialize pheromone levels for each transportation mode

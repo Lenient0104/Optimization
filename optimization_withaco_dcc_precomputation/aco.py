@@ -116,6 +116,7 @@ class Ant:
             print(f"Error updating SoC data: {str(e)}")
             return False  # Return False to indicate failure
 
+    # need changing
     def find_all_next_moves(self, current_edge):
         # Initialize an empty list to store possible next moves
         possible_next_moves = []
@@ -158,6 +159,7 @@ class Ant:
 
         return possible_next_moves
 
+    # need changing
     def move(self):
         current_location, current_mode, current_vehicle_id, _ = self.path[-1]
         all_possible_next_moves = self.find_all_next_moves(current_location)
@@ -191,6 +193,7 @@ class Ant:
             # if self.reach_destination(edge) and self.total_time_cost < self.best_time:
             #     self.update_pheromones()
 
+    # need changing
     def decrease_pheromones(self, edge):
         # Decrease pheromones for the given edge
         evaporation_rate = 0.1  # Adjust as necessary
@@ -199,6 +202,7 @@ class Ant:
             for mode in self.edges[edge]['pheromone_levels']:
                 self.edges[edge]['pheromone_levels'][mode]['to'] *= (1 - evaporation_rate) * penalty_factor
 
+    # need changing
     def calculate_move_probabilities(self, next_moves, change_device_probability, walking_preference):
         alpha = 3  # Pheromone importance
         beta = 0  # Heuristic importance
