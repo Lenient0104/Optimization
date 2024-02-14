@@ -16,13 +16,14 @@ from e_car import ECar_EnergyConsumptionModel
 from e_bike import Ebike_PowerConsumptionCalculator
 from e_scooter import Escooter_PowerConsumptionCalculator
 import matplotlib
-matplotlib.use('TkAgg')  # Use Tkinter backend
-import matplotlib.pyplot as plt
 
+matplotlib.use('TkAgg')  # Use Tkinter backend
 
 
 class Optimization:
-    def __init__(self, net_xml_path, user, db_path):
+    def __init__(self, net_xml_path, user, db_path, start_edge, destinatiin_edge):
+        self.mode_stations = None
+        self.new_graph = None
         self.user = user
         self.unique_edges = []
         self.connections = []
@@ -44,6 +45,7 @@ class Optimization:
 
         self.initialize_pheromone_levels()
         self.G = self.build_graph()
+        self.new_graph = self.build_new_graph(start_edge, destinatiin_edge)
 
     def parse_net_xml(self, filepath):
         pattern = r"^[A-Za-z]+"
@@ -155,42 +157,12 @@ class Optimization:
             edge_data['mode_time']['walking']['to_time'] = edge_data['to_length'] / edge_data['speed']['walking'][
                 'speed']
 
-    # Define a function to generate random stations for an edge
-    # def generate_random_stations(self):
-    #     # Initialize a list of stations with 'walking' station
-    #     stations = ['walking']
-    #     station_types = ['e_bike_1', 'e_scooter_1', 'e_car']
-    #
-    #     # Randomly decide whether to add other station types
-    #     for station_type in station_types:
-    #         if random.choice([True, False]):
-    #             stations.append(station_type)
-    #     print(stations)
-    #     return stations
-    #
-    # def get_stations(self):
-    #     # Create a dictionary to store stations for each edge
-    #     edge_stations = {}
-    #
-    #     # Randomly select up to 10 edges if there are more than 10, else select all
-    #     selected_edges = random.sample(self.unique_edges, min(len(self.unique_edges), 10))
-    #
-    #     # Initialize all edges with just 'walking' station
-    #     for edge_id in self.unique_edges:
-    #         edge_stations[edge_id] = ['walking']
-    #
-    #     # Generate stations for the selected edges
-    #     for edge_id in selected_edges:
-    #         edge_stations[edge_id] = self.generate_random_stations()
-    #
-    #     return edge_stations
-
     def get_stations(self):
         # Ensure all edges initially have just a 'walking' station
         edge_stations = {edge_id: ['walking'] for edge_id in self.unique_edges}
 
         # Determine the number of edges to assign e-mobility stations to (up to 10)
-        num_edges_to_assign = min(len(self.unique_edges), 10)
+        num_edges_to_assign = min(len(self.unique_edges), 3)
 
         # Select random edges to assign e-mobility stations
         edges_to_assign = random.sample(self.unique_edges, num_edges_to_assign)
@@ -292,7 +264,7 @@ class Optimization:
                 'e_bike_1': 10,
                 'e_car': 5,
                 'e_scooter_1': 8,
-                'walking': 20
+                'walking': 200
             })
         print(G.number_of_nodes(), G.number_of_edges())
         return G
@@ -326,6 +298,7 @@ class Optimization:
 
         # Optionally, print the classification result for debugging
         # print(mode_stations)
+        self.mode_stations = mode_stations
         return mode_stations
 
     def calculate_all_modes_shortest_paths(self):
@@ -412,8 +385,8 @@ class Optimization:
 
         return paths_to_destination
 
-    def build_all_modes_paths_graph_corrected(self, start_edge, destination_edge):
-        paths_graph = nx.DiGraph()
+    def build_new_graph(self, start_edge, destination_edge):
+        paths_graph = nx.MultiDiGraph()
 
         # Collect all station edges
         station_classifications = self.classify_stations()
@@ -429,7 +402,7 @@ class Optimization:
             for (source, target), (path, total_time) in mode_shortest_paths.items():
                 if {source, target}.issubset(all_station_edges):
                     # Add a direct edge with total time cost as the weight
-                    paths_graph.add_edge(source, target, weight=total_time, mode=mode)
+                    paths_graph.add_edge(source, target, weight=total_time, key=mode, path=path, pheromone_level=0.1)
 
         # Assume direct connections for walking paths with calculated total time costs
         walking_paths_from_start = self.calculate_walking_paths_from_start(start_edge, destination_edge)
@@ -438,13 +411,16 @@ class Optimization:
         # Add walking paths from start to all station edges and the destination with total time as weight
         for target, (path, total_time) in walking_paths_from_start.items():
             if target in all_station_edges:
-                paths_graph.add_edge(start_edge, target, weight=total_time, mode='walking')
+                paths_graph.add_edge(start_edge, target, weight=total_time, key='walking', path=path,
+                                     pheromone_level=0.1)
 
         # Add walking paths from all station edges and the start to the destination with total time as weight
         for source, (path, total_time) in walking_paths_to_destination.items():
             if source in all_station_edges:
-                paths_graph.add_edge(source, destination_edge, weight=total_time, mode='walking')
+                paths_graph.add_edge(source, destination_edge, weight=total_time, key='walking', path=path,
+                                     pheromone_level=0.1)
 
+        self.new_graph = paths_graph
         return paths_graph
 
     def visualize_paths_graph_interactive(self, paths_graph):
@@ -496,7 +472,7 @@ class Optimization:
         return output_path
 
     def visualize_paths_graph(self, paths_graph):
-        plt.figure(figsize=(12, 12))  # Increase figure size
+        plt.figure(figsize=(50, 50))  # Increase figure size
         pos = nx.kamada_kawai_layout(paths_graph)  # Use a different layout
 
         nx.draw_networkx_nodes(paths_graph, pos, node_size=500, node_color='lightblue')
@@ -517,23 +493,124 @@ class Optimization:
         print(self.calculate_walking_paths_from_start(source, end))
         print("The walking paths from start and stations to end:")
         print(self.calculate_walking_paths_to_destination(source, end))
-        new_graph = self.build_all_modes_paths_graph_corrected(source, end)
+        self.new_graph = self.build_new_graph(source, end)
         # self.visualize_paths_graph_interactive(new_graph)
-        # self.visualize_paths_graph(new_graph)
-        print(new_graph.number_of_nodes(), new_graph.number_of_edges())
+        self.visualize_paths_graph(self.new_graph)
+        print(self.new_graph.number_of_nodes(), self.new_graph.number_of_edges())
 
+    def update_pheromones(self, ant):
+        total_pheromone = 0
+        for i in range(0, len(ant.path) - 1):
+            edge_1, mode_1, _, _ = ant.path[i]
+            edge_2, mode_2, _, _ = ant.path[i + 1]
+            # Retrieve all edge data between edge_1 and edge_2
+            all_edges_data = self.new_graph.get_edge_data(edge_1, edge_2)
 
+            # Check if there are any edges between these nodes
+            if all_edges_data:
+                for key, edge_data in all_edges_data.items():
+                    if key == mode_1:
+                        # Correctly access and update pheromone level
+                        current_pheromone_level = edge_data.get('pheromone_level',
+                                                                0)  # Get current level, default to 0 if not set
+                        # Update pheromone level
+                        updated_pheromone_level = current_pheromone_level + self.pheromone_deposit_function(
+                            ant.total_time_cost)
+                        # Set the updated pheromone level back on the edge
+                        self.new_graph[edge_1][edge_2][key]['pheromone_level'] = updated_pheromone_level
 
+            total_pheromone = total_pheromone + self.new_graph[edge_1][edge_2][key]['pheromone_level']
+        return total_pheromone
 
+    def pheromone_deposit_function(self, path_cost):
+        # Higher deposit for faster paths
+        return 1 / path_cost  # Example function, adjust as needed
 
+    def find_best_path(self, ants, destination_edge, pheromones):
+        best_ant = None
+        best_phe = 0
+        for ant in ants:
+            # Check if the ant has reached the destination
+            if ant.path[-1][0] == destination_edge:
+                # If the ant has reached the destination and has a lower total time cost
+                if pheromones[ant] > best_phe:
+                    best_phe = pheromones[ant]
+                    best_ant = ant
 
+        return best_ant
 
+    def run_aco_algorithm(self, start_edge, destination_edge, number_of_ants, number_of_iterations, mode='walking'):
+        if start_edge not in self.unique_edges:
+            print(f"There's no edge {start_edge} in this map.")
+            return
+        if destination_edge not in self.unique_edges:
+            print(f"There's no edge {destination_edge} in this map.")
+            return
 
+        log_interval = 1
+        # Initialize ants with specified start and destination locations
+        # ants = [Ant(start_edge, destination_edge, self.db_connection, self.edges, mode) for _ in
+        #         range(number_of_ants)]
 
+        best_time_cost = float('inf')
+        ant_index = 1
+        ants = []
+        total_pheromones = {}
+        pheromones = []
+        max_pheromone = 0
+        time_costs = []
+        time_cost_counts = {}
 
+        # print(self.edges_station)
+        for ant_num in range(number_of_ants):
+            ant = Ant(start_edge, destination_edge, self.db_connection, self.edges, self.mode_stations, ant_index,
+                      self.new_graph, mode)
+            # print("ant", ant_index)
+            move_count = 0
+            while ant.path[-1][0] != destination_edge and ant.stop is False:
+                # and ant.total_time_cost <= best_time_cost
+                ant.move()
+                if len(ant.path) > 2 and (ant.path[-1][0] == ant.path[-2][0]):
+                    break
+                move_count += 1
+                if move_count > 1000:
+                    # print("Move limit reached, breaking out of loop.")
+                    break
+            # time_costs.append(ant.total_time_cost)
+            # print(ant.path)
+            if ant.path[-1][0] == destination_edge:
+                # paths.append(ant.path)
+                # print(ant.path)
+                # print("time cost:", ant.total_time_cost)
 
+                if ant.total_time_cost <= best_time_cost:
+                    # print("curren best time cost", best_time_cost)
+                    # print("curren time cost", ant.total_time_cost)
+                    time_costs.append(ant.total_time_cost)
+                    ants.append(ant)
+                    best_time_cost = ant.total_time_cost
+                    total_pheromone = self.update_pheromones(ant)
+                    total_pheromones[ant] = total_pheromone
+                    # print("updated")
+                # Count the occurrence of the time cost
+                if ant.total_time_cost in time_cost_counts:
+                    time_cost_counts[ant.total_time_cost] += 1
+                else:
+                    time_cost_counts[ant.total_time_cost] = 1
+            ant_index = ant_index + 1
 
+        current_best_ant = self.find_best_path(ants, destination_edge, total_pheromones)  # based on pheromone level
+        best_path = current_best_ant.path
+        best_time_cost = current_best_ant.total_time_cost
+        # best_distance_cost = current_best_ant.path_length
 
-
-
-
+        # if (iteration + 1) % log_interval == 0 or iteration == number_of_iterations - 1: print( f"Iteration {
+        # iteration + 1}/{number_of_iterations}: Best Path = {best_path}, Time Cost = {best_time_cost},
+        # Total Distance = {best_distance_cost}")
+        if best_path is None:
+            print("There's no route from start to destination.")
+            return
+        print(
+            f"Best Path after all iterations: Best Path = {best_path}, Time Cost = {best_time_cost}")
+        # self.visualization(time_costs, number_of_ants)
+        return best_path

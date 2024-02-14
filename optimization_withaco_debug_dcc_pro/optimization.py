@@ -408,7 +408,7 @@ class Optimization:
         return paths_to_destination
 
     def build_all_modes_paths_graph_corrected(self, start_edge, destination_edge):
-        paths_graph = nx.DiGraph()
+        paths_graph = nx.MultiDiGraph()
 
         # Collect all station edges
         station_classifications = self.classify_stations()
@@ -505,6 +505,27 @@ class Optimization:
         plt.axis('off')
         plt.show()
 
+
+    def visualize_paths_graph_multi(self, paths_graph):
+        pos = nx.spring_layout(paths_graph)  # Position nodes using a layout algorithm
+
+        nx.draw(paths_graph, pos, with_labels=True, node_size=700, node_color='lightblue', edge_color='gray',
+                arrows=True)
+
+        # Simplify edge labels for MultiDiGraph: select one edge between each pair of nodes for labeling
+        edge_labels = {}
+        for u, v, data in paths_graph.edges(data=True):
+            # Example: Select the first edge's 'mode' attribute as the label, or aggregate information
+            if (u, v) not in edge_labels:  # Avoid overwriting if an edge label already exists for this node pair
+                edge_labels[(u, v)] = f"{data.get('mode', '')}\n{data.get('weight', '')}"
+
+        # Draw edge labels
+        nx.draw_networkx_edge_labels(paths_graph, pos, edge_labels=edge_labels, font_size=7)
+
+        plt.title("Paths Graph Visualization")
+        plt.axis('off')  # Turn off the axis numbers / labels
+        plt.show()
+
     def pre_computation(self, source, end):
         print("The path between station edges:")
         print(self.calculate_all_modes_shortest_paths())
@@ -514,7 +535,7 @@ class Optimization:
         print(self.calculate_walking_paths_to_destination(source, end))
         new_graph = self.build_all_modes_paths_graph_corrected(source, end)
         # self.visualize_paths_graph_interactive(new_graph)
-        # self.visualize_paths_graph(new_graph)
+        self.visualize_paths_graph_multi(new_graph)
         print(new_graph.number_of_nodes(), new_graph.number_of_edges())
 
 

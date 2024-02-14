@@ -27,6 +27,7 @@ class Optimization:
         self.map_energy_to_lanes(60, 1)
         self.map_station_availability()
         self.initialize_pheromone_levels()
+        self.stations = {}
 
     def parse_net_xml(self, filepath):
         tree = ET.parse(filepath)
