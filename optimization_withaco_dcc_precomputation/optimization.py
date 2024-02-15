@@ -3,6 +3,8 @@ import re
 import sqlite3
 import time
 import random
+
+import matplotlib
 import networkx as nx
 
 from aco import Ant
@@ -15,7 +17,7 @@ from collections import defaultdict
 from e_car import ECar_EnergyConsumptionModel
 from e_bike import Ebike_PowerConsumptionCalculator
 from e_scooter import Escooter_PowerConsumptionCalculator
-import matplotlib
+
 
 matplotlib.use('TkAgg')  # Use Tkinter backend
 
@@ -162,7 +164,7 @@ class Optimization:
         edge_stations = {edge_id: ['walking'] for edge_id in self.unique_edges}
 
         # Determine the number of edges to assign e-mobility stations to (up to 10)
-        num_edges_to_assign = min(len(self.unique_edges), 3)
+        num_edges_to_assign = min(len(self.unique_edges), 4)
 
         # Select random edges to assign e-mobility stations
         edges_to_assign = random.sample(self.unique_edges, num_edges_to_assign)
@@ -170,12 +172,12 @@ class Optimization:
         # Assign at least one e-mobility station type to each selected edge
         for edge_id in edges_to_assign:
             # Choose at least one e-mobility station type for this edge
-            e_mobility_stations = random.sample(['e_bike_1', 'e_scooter_1', 'e_car'], k=1)
-            # There's an opportunity to add more e-mobility stations randomly
-            for station in ['e_bike_1', 'e_scooter_1', 'e_car']:
-                if station not in e_mobility_stations and random.choice([True, False]):
-                    e_mobility_stations.append(station)
-            # Assign the selected e-mobility stations to this edge
+            e_mobility_stations = random.sample(['e_bike_1', 'e_scooter_1', 'e_car'], k=3)
+            # # There's an opportunity to add more e-mobility stations randomly
+            # for station in ['e_bike_1', 'e_scooter_1', 'e_car']:
+            #     if station not in e_mobility_stations and random.choice([True, False]):
+            #         e_mobility_stations.append(station)
+            # # Assign the selected e-mobility stations to this edge
             edge_stations[edge_id] = ['walking'] + e_mobility_stations
 
         return edge_stations
@@ -402,7 +404,7 @@ class Optimization:
             for (source, target), (path, total_time) in mode_shortest_paths.items():
                 if {source, target}.issubset(all_station_edges):
                     # Add a direct edge with total time cost as the weight
-                    paths_graph.add_edge(source, target, weight=total_time, key=mode, path=path, pheromone_level=0.1)
+                    paths_graph.add_edge(source, target, weight=total_time, path=path, pheromone_level=0.1, key=mode)
 
         # Assume direct connections for walking paths with calculated total time costs
         walking_paths_from_start = self.calculate_walking_paths_from_start(start_edge, destination_edge)
@@ -421,9 +423,11 @@ class Optimization:
                                      pheromone_level=0.1)
 
         self.new_graph = paths_graph
+        print("The graph edges are:" , paths_graph.edges)
+        # self.visualize_paths_graph(paths_graph)
         return paths_graph
 
-    def visualize_paths_graph_interactive(self, paths_graph):
+    def visualize_paths_graph_interactive(self, paths_graph, start_node, end_node):
         # Initialize the Network object with cdn_resources set to 'remote' for better compatibility
         nt = Network(notebook=True, height="750px", width="100%", bgcolor="#222222", font_color="white",
                      cdn_resources='remote')
@@ -437,19 +441,27 @@ class Optimization:
         # Add nodes and edges with attributes
         for node in paths_graph.nodes:
             if node.startswith("station_"):
-                nt.add_node(node, title=node, color=station_color)
-            elif node in paths_graph.graph['start_nodes'] or node in paths_graph.graph['end_nodes']:
+                # Get station name without the prefix
+                station_name = node.replace("station_", "")
+                nt.add_node(node, title=station_name, color=station_color)
+            elif node == start_node or node == end_node:
                 nt.add_node(node, title=node, color=start_end_color)
             else:
                 nt.add_node(node, title=node, color=other_edge_color)
 
-        for edge in paths_graph.edges(data=True):
-            src, dst, attr = edge
-            title = f"Mode: {attr['mode']}"
-            if attr['mode'] == 'walking':
-                nt.add_edge(src, dst, title=title, color=walking_edge_color)
+        for src, dst, attr in paths_graph.edges(data=True):
+            # Modify edge titles to display mode and total time
+            mode = attr.get('key', 'unknown')
+            total_time = attr.get('weight', 'unknown')
+            title = f"Mode: {mode}, Time: {total_time}"
+            if mode == 'walking':
+                nt.add_edge(src, dst, title=title, color=walking_edge_color, arrows='to')
+            elif mode == 'e_car':
+                nt.add_edge(src, dst, title=title, color='red', arrows='to')
+            elif mode == 'e_scooter_1':
+                nt.add_edge(src, dst, title=title, color='green', arrows='to')
             else:
-                nt.add_edge(src, dst, title=title, color=other_edge_color)
+                nt.add_edge(src, dst, title=title, color=other_edge_color, arrows='to')
 
         # Configure the physics layout of the network
         nt.set_options(options="""{
@@ -462,7 +474,7 @@ class Optimization:
               "damping": 0.09,
               "avoidOverlap": 0.1
             },
-            "minVelocity": 0.75
+            "minVelocity": 0
           }
         }""")
 
@@ -472,20 +484,23 @@ class Optimization:
         return output_path
 
     def visualize_paths_graph(self, paths_graph):
-        plt.figure(figsize=(50, 50))  # Increase figure size
+        plt.figure(figsize=(12, 12))  # Increase figure size
         pos = nx.kamada_kawai_layout(paths_graph)  # Use a different layout
 
+        # Draw nodes and edges
         nx.draw_networkx_nodes(paths_graph, pos, node_size=500, node_color='lightblue')
         nx.draw_networkx_edges(paths_graph, pos, edge_color='gray', arrows=True)
         nx.draw_networkx_labels(paths_graph, pos, font_size=8)
 
-        edge_labels = nx.get_edge_attributes(paths_graph, 'mode')
+        # Prepare edge labels: combine mode and weight
+        edge_labels = {(u, v): f"{d['key']} ({d['weight']})" for u, v, d in paths_graph.edges(data=True)}
+
+        # Draw edge labels
         nx.draw_networkx_edge_labels(paths_graph, pos, edge_labels=edge_labels, font_size=7)
 
         plt.title("Shortest Paths Graph Visualization")
-        plt.axis('off')
+        plt.axis('off')  # Hide axes
         plt.show()
-
     def pre_computation(self, source, end):
         print("The path between station edges:")
         print(self.calculate_all_modes_shortest_paths())
@@ -565,7 +580,7 @@ class Optimization:
         for ant_num in range(number_of_ants):
             ant = Ant(start_edge, destination_edge, self.db_connection, self.edges, self.mode_stations, ant_index,
                       self.new_graph, mode)
-            # print("ant", ant_index)
+            print("ant", ant_index)
             move_count = 0
             while ant.path[-1][0] != destination_edge and ant.stop is False:
                 # and ant.total_time_cost <= best_time_cost
@@ -580,8 +595,8 @@ class Optimization:
             # print(ant.path)
             if ant.path[-1][0] == destination_edge:
                 # paths.append(ant.path)
-                # print(ant.path)
-                # print("time cost:", ant.total_time_cost)
+                print(ant.path)
+                print("time cost:", ant.total_time_cost)
 
                 if ant.total_time_cost <= best_time_cost:
                     # print("curren best time cost", best_time_cost)

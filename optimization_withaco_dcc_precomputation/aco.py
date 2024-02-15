@@ -120,7 +120,7 @@ class Ant:
         #     self.backtrack()
         #     return
         move_probabilities = self.calculate_move_probabilities(all_possible_next_moves, 0.2, 1)
-        # print(move_probabilities)
+        print(move_probabilities)
         if move_probabilities is None:
             self.stop = True
             # Apply penalty to the step before last if it exists
@@ -135,7 +135,7 @@ class Ant:
             chosen_edge, chosen_mode, _ = chosen_move
             if chosen_mode != current_mode and current_mode != 'walking':
                 self.device_to_return = True
-            # print("chosen_move:", chosen_move)
+            print("chosen_move:", chosen_move)
             self.update_ant_state(chosen_move)
 
     def decrease_pheromones(self, current_edge, previous_edge, mode):
@@ -150,7 +150,7 @@ class Ant:
 
     # need changing
     def calculate_move_probabilities(self, next_moves, change_device_probability, walking_preference):
-        alpha = 3  # Pheromone importance
+        alpha = 1  # Pheromone importance
         beta = 0  # Heuristic importance
         gamma = 0  # Energy importance
         edges = self.edges
@@ -159,7 +159,7 @@ class Ant:
         current_loc, current_mode, current_vehicle_id, _ = self.path[-1]  # Current location and mode
         # print("current edge:", current_loc)
         # print("current mode:", current_mode)
-
+        print("all next moves:", next_moves)
         for next_move in next_moves:
             next_edge, mode, time_cost = next_move
 
@@ -182,7 +182,7 @@ class Ant:
                 probabilities[next_move] = probability
                 continue
             # we are not walking but the next edge doesn't have current station, so keep going
-            if current_mode != 'walking' and not has_current_station:
+            if current_mode != 'walking' and not has_current_station and next_edge != self.dest_edge:
                 probability = 0
                 probabilities[next_move] = probability
                 continue
@@ -196,7 +196,8 @@ class Ant:
             # --------------------------------- start probability calculation ---------------------------------#
             pheromone_level = graph.get_edge_data(current_loc, next_edge, key=mode)['pheromone_level']
 
-            heuristic = 1 / time_cost if time_cost > 0 else 0  # Avoid division by zero
+            # heuristic = 1 / time_cost if time_cost > 0 else 0  # Avoid division by zero
+            heuristic = 1
 
             # calculate the possibility to change mode
             if mode != current_mode:
