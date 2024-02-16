@@ -7,7 +7,7 @@ import pandas as pd
 G = nx.DiGraph()
 
 # Read the CSV data into a DataFrame
-df = pd.read_csv('../optimization/graph202308142106_edges.csv')  # Replace 'your_data.csv' with your actual CSV file name
+df = pd.read_csv('../aco/optimization/graph202308142106_edges.csv')  # Replace 'your_data.csv' with your actual CSV file name
 
 
 def fetch_realtime_data(step):

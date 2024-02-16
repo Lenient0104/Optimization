@@ -81,8 +81,8 @@ def compute_shortest_path_and_visualize(net_xml_file, csv_file, start_node, end_
 
 
 # Example usage:
-net_xml_file = '../optimization/graph202308142106.net.xml'
-csv_file = '../optimization/graph202308142106_edges.csv'
+net_xml_file = '../aco/optimization/graph202308142106.net.xml'
+csv_file = '../aco/optimization/graph202308142106_edges.csv'
 start_node = '8396907063'
 end_node = '530941809'
 path, distance = compute_shortest_path_and_visualize(net_xml_file, csv_file, start_node, end_node)

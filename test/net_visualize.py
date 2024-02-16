@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 
 # Load the XML file
-tree = ET.parse('../optimization/graph202308142106.net.xml')
+tree = ET.parse('../aco/optimization/graph202308142106.net.xml')
 root = tree.getroot()
 
 # Create a directed graph

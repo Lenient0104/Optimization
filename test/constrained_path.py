@@ -129,8 +129,8 @@ def plot_graph_with_path(G, path):
 
 
 # Parsing .net.xml
-edges = parse_net_xml('../optimization/graph202308142106.net.xml')
-map_speeds_to_lanes('../optimization/graph202308142106_edges.csv', edges)
+edges = parse_net_xml('../aco/optimization/graph202308142106.net.xml')
+map_speeds_to_lanes('../aco/optimization/graph202308142106_edges.csv', edges)
 G = build_graph_from_edges(edges)
 
 # Define your constraints and source, target nodes
