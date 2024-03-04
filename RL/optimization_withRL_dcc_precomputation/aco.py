@@ -18,13 +18,13 @@ class Ant:
         self.reach_dest = False
         if mode == 'walking':
             self.path = [(start_edge, mode, 'pedestrian', 'pedestrian')]
-            # self.initial_energy['pedestrian'] = 0
-            # self.remaining_energy['pedestrian'] = 0
+            self.initial_energy['pedestrian'] = 0
+            self.remaining_energy['pedestrian'] = 0
         else:
             if self.has_current_station(self.start_edge, mode):
-                # self.vehicle_id, self.energy_level = self.get_best_vehicle_and_energy(mode)  # the vehicle being chosen
-                # self.initial_energy = {self.vehicle_id: self.energy_level}
-                # self.remaining_energy = {self.vehicle_id: self.energy_level}
+                self.vehicle_id, self.energy_level = self.get_best_vehicle(mode)  # the vehicle being chosen
+                self.initial_energy = {str(self.vehicle_id): self.energy_level}
+                self.remaining_energy = {str(self.vehicle_id): self.energy_level}
                 self.path = [(start_edge, mode, 0, 0)]
             else:
                 # print('There are no available station on this edge.')
@@ -108,19 +108,16 @@ class Ant:
             for key, edge_data in edge_data.items():
                 mode = key
                 time = edge_data["weight"]
-                possible_next_moves.append((next_edge, mode, time))
+                distance = edge_data["distance"]
+                possible_next_moves.append((next_edge, mode, distance, time))
 
         return possible_next_moves
 
     def move(self):
         current_location, current_mode, current_vehicle_id, _ = self.path[-1]
         all_possible_next_moves = self.find_all_next_moves(current_location)
-        # print(all_possible_next_moves)
-        # if len(all_possible_next_moves) == 0:
-        #     self.backtrack()
-        #     return
         move_probabilities = self.calculate_move_probabilities(all_possible_next_moves, 0.2, 1)
-        print(move_probabilities)
+        # print(move_probabilities)
         if move_probabilities is None:
             self.stop = True
             # Apply penalty to the step before last if it exists
@@ -132,10 +129,10 @@ class Ant:
 
         if move_probabilities:
             chosen_move = random.choices(all_possible_next_moves, weights=list(move_probabilities.values()), k=1)[0]
-            chosen_edge, chosen_mode, _ = chosen_move
+            chosen_edge, chosen_mode, _, _ = chosen_move
             if chosen_mode != current_mode and current_mode != 'walking':
                 self.device_to_return = True
-            print("chosen_move:", chosen_move)
+            # print("chosen_move:", chosen_move)
             self.update_ant_state(chosen_move)
 
     def decrease_pheromones(self, current_edge, previous_edge, mode):
@@ -152,16 +149,16 @@ class Ant:
     def calculate_move_probabilities(self, next_moves, change_device_probability, walking_preference):
         alpha = 1  # Pheromone importance
         beta = 0  # Heuristic importance
-        gamma = 0  # Energy importance
+        gamma = 1  # Energy importance
         edges = self.edges
         probabilities = {}
         graph = self.graph
         current_loc, current_mode, current_vehicle_id, _ = self.path[-1]  # Current location and mode
         # print("current edge:", current_loc)
         # print("current mode:", current_mode)
-        print("all next moves:", next_moves)
+        # print("all next moves:", next_moves)
         for next_move in next_moves:
-            next_edge, mode, time_cost = next_move
+            next_edge, mode, distance, time_cost = next_move
 
             has_current_station = self.has_current_station(next_edge, current_mode)
             if self.is_visited(next_move) or self.is_cycle(next_move):
@@ -171,14 +168,14 @@ class Ant:
             # same mode
             if current_mode != 'walking' and not has_current_station and mode == current_mode:
                 pheromone_level = graph.get_edge_data(current_loc, next_edge, key=mode)['pheromone_level']
-                probability = pheromone_level
+                probability = pheromone_level * 0.001
                 probabilities[next_move] = probability
                 continue
             # we are walking and there's no station for change, and we found the next move is walking which is what
             # we want
             if current_mode == 'walking' and not self.has_station(next_edge) and mode == current_mode:
                 pheromone_level = graph.get_edge_data(current_loc, next_edge, key=mode)['pheromone_level']
-                probability = pheromone_level
+                probability = pheromone_level * 0.001
                 probabilities[next_move] = probability
                 continue
             # we are not walking but the next edge doesn't have current station, so keep going
@@ -196,6 +193,7 @@ class Ant:
             # --------------------------------- start probability calculation ---------------------------------#
             pheromone_level = graph.get_edge_data(current_loc, next_edge, key=mode)['pheromone_level']
 
+
             # heuristic = 1 / time_cost if time_cost > 0 else 0  # Avoid division by zero
             heuristic = 1
 
@@ -209,9 +207,8 @@ class Ant:
                     #         self.path_length + self.find_edge_length(next_edge))
                     heuristic = 1
                 else:
-                    # new_vehicle_id, new_energy_level = self.get_best_vehicle_and_energy(
-                    #     mode)  # the vehicle being chosen
-                    energy_factor = 1
+                    new_vehicle_id, new_energy_level = self.get_best_vehicle(mode)
+                    energy_factor = new_energy_level / 100
 
                 # Calculate the overall probability components
                 pheromone_component = pheromone_level ** alpha
@@ -219,32 +216,38 @@ class Ant:
                 energy_component = energy_factor ** gamma
                 # Calculate the overall probability with the change device rate and station availability factors
                 probability = (  # probability for this move
-                        pheromone_component * heuristic_component * energy_component
+                        pheromone_component * heuristic_component * energy_component * change_device_probability
                 )
                 probabilities[next_move] = probability
 
             # calculate the possibility to not change mode
             elif mode == current_mode:
-                # If the energy is insufficient, set the probability for using the current mode to 0
-                # if not self.is_energy_enough(next_move):
-                #     probability = 0
-                #     probabilities[next_move] = probability
-                #     continue
+                if not self.is_energy_enough(next_move):
+                    probability = 0
+                    probabilities[next_move] = probability
+                    continue
                 if mode == 'walking':
                     energy_factor = 1.0
                 else:
-                    # energy_factor = self.remaining_energy[current_vehicle_id] / self.initial_energy[
-                    #     current_vehicle_id] if self.remaining_energy[current_vehicle_id] > 0 else 0
-                    energy_factor = 1
+                    energy_factor = self.remaining_energy[current_vehicle_id] / self.initial_energy[
+                        current_vehicle_id] if self.remaining_energy[current_vehicle_id] > 0 else 0
+                    # energy_factor = 1
                 # Calculate the overall probability components
                 pheromone_component = pheromone_level ** alpha
                 heuristic_component = heuristic ** beta
                 energy_component = energy_factor ** gamma
-                # Calculate the overall probability with the change device rate and station availability factors
-                probability = (  # probability for this move
-                        pheromone_component * heuristic_component * energy_component
-                )
-                probabilities[next_move] = probability
+                if mode == 'walking' and current_mode == 'walking':
+                    probability = (  # we encourage to use device
+                            pheromone_component * heuristic_component * energy_component * change_device_probability
+                    )
+                    probabilities[next_move] = probability
+
+                else: # Calculate the overall probability with the change device rate and station availability factors
+                    probability = (  # probability for this move
+                            pheromone_component * heuristic_component * energy_component * (1 - change_device_probability)
+                    )
+                    probabilities[next_move] = probability
+
 
         total = sum(probabilities.values())
         if total == 0:
@@ -254,6 +257,33 @@ class Ant:
         normalized_probabilities = {move: p / total for move, p in probabilities.items()} if total >= 0 else {}
         return normalized_probabilities
 
+    def get_best_vehicle(self, mode):
+        if mode == 'walking':
+            return "pedestrian", "pedestrian"
+        if mode == 'e_bike_1':
+            e_bike_id = 'eb' + str(random.randint(0, 10))
+            soc = random.randint(70, 100)
+            return e_bike_id, soc
+        elif mode == 'e_scooter_1':
+            e_scooter_id = 'es' + str(random.randint(0, 10))
+            soc = random.randint(70, 100)
+            return e_scooter_id, soc
+        elif mode == 'e_car':
+            e_car_id = 'ec' + str(random.randint(0, 10))
+            soc = random.randint(70, 100)
+            return e_car_id, soc
+
+    def calculate_energy_comsumption(self, current_mode, distance):
+        # Define vehicle efficiency in Wh per meter (converted from Wh per km)
+        vehicle_efficiency = {'e_bike_1': 20 / 1000, 'e_scooter_1': 25 / 1000, 'e_car': 150 / 1000}
+        # battery_capacity = {'e_bike_1': 500, 'e_scooter_1': 250, 'e_car': 50000}
+        battery_capacity = {'e_bike_1': 500, 'e_scooter_1': 250, 'e_car': 5000}
+        energy_consumed = vehicle_efficiency[current_mode] * distance
+        # Calculate the delta SoC (%) for the distance traveled
+        delta_soc = (energy_consumed / battery_capacity[current_mode]) * 100
+
+        return delta_soc
+
     def reach_destination(self, current_edge):
         if current_edge == self.dest_edge:
             return True
@@ -261,15 +291,16 @@ class Ant:
 
     def is_energy_enough(self, next_move):
         current_loc, current_mode, current_vehicle_id, _ = self.path[-1]
-        next_edge, mode, energy_cost, time_cost = next_move
+        next_edge, mode, distance, time_cost = next_move
         if mode == 'walking':
             return True
-        if self.remaining_energy[current_vehicle_id] <= self.calculate_soc(current_mode, energy_cost):
+        if self.remaining_energy[current_vehicle_id] <= self.calculate_energy_comsumption(current_mode, distance):
+            # print("energy not enough")
             return False
         return True
 
     def is_visited(self, next_move):
-        next_edge, mode, time_cost = next_move
+        next_edge, mode, distance, time_cost = next_move
         path = self.path
 
         # Iterate through the path to check if next_edge has been visited
@@ -382,16 +413,16 @@ class Ant:
     def update_ant_state(self, next_move):
         # real move
         current_loc, current_mode, current_vehicle_id, _ = self.path[-1]
-        next_edge, mode, time_cost = next_move
+        next_edge, mode, distance, time_cost = next_move
 
         # if the ant needs to return the device or change device
         if self.device_to_return or (current_mode == 'walking' and mode != current_mode):
-            # if self.device_to_return:
-            #     self.return_device(current_vehicle_id)
-            # new_vehicle_id, new_energy = self.get_best_vehicle_and_energy(mode)
-            self.path.append((next_edge, mode, 0, 0))
-            # self.remaining_energy[new_vehicle_id] = new_energy
-            # self.initial_energy[new_vehicle_id] = new_energy
+            if self.device_to_return:
+                self.return_device(current_vehicle_id)
+            new_vehicle_id, new_energy = self.get_best_vehicle(mode)
+            self.path.append((next_edge, mode, new_vehicle_id, new_energy))
+            self.remaining_energy[str(new_vehicle_id)] = new_energy
+            self.initial_energy[str(new_vehicle_id)] = new_energy
             self.total_time_cost += time_cost
             # self.path_length += self.find_edge_length(next_edge)
 
@@ -407,11 +438,12 @@ class Ant:
             return
 
         # keep using same device
-        # self.remaining_energy[current_vehicle_id] -= self.calculate_soc(current_mode, energy_cost)
-        # self.path.append((next_edge, current_mode, current_vehicle_id, self.remaining_energy[current_vehicle_id]))
-        self.path.append((next_edge, current_mode, 0, 0))
+        self.remaining_energy[current_vehicle_id] -= self.calculate_energy_comsumption(current_mode, distance)
+        self.path.append((next_edge, current_mode, current_vehicle_id, self.remaining_energy[current_vehicle_id]))
+        # self.path.append((next_edge, current_mode, 0, 0))
         self.total_time_cost += time_cost
         #self.path_length += self.find_edge_length(next_edge)
+
         return
 
     def calculate_soc(self, mode, energy):

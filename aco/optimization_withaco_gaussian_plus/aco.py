@@ -318,6 +318,7 @@ class Ant:
             return False
         return True
 
+
     def is_visited(self, next_move):
         next_edge, mode, energy_cost, time_cost = next_move
         path = self.path
