@@ -203,7 +203,7 @@ class Optimization:
             for mode, times in edge_data['mode_time'].items():
                 # 计算现有时间的平均值
                 average_time = (times['from_time'] + times['to_time']) / 2
-                print(average_time)
+                # print(average_time)
 
                 # 计算标准差
                 stddev = average_time * stddev_coefficient
@@ -261,7 +261,7 @@ class Optimization:
         query = "SELECT StationEdgeID, StationType FROM StationLocation"
         cursor.execute(query)
         station_data = cursor.fetchall()
-        print(station_data)
+        # print(station_data)
 
         for station_edge_id, station_type in station_data:
             for connection_id, edge_data in self.edges.items():
@@ -434,7 +434,7 @@ class Optimization:
             # time_costs.append(ant.total_time_cost)
             if ant.path[-1][0] == destination_edge:
                 # paths.append(ant.path)
-                print(ant.path)
+                # print(ant.path)
                 ants_found.append(ant)
                 # print("time cost:", ant.total_time_cost)
                 if ant.total_time_cost <= best_time_cost:
@@ -451,7 +451,7 @@ class Optimization:
                     time_cost_counts[ant.total_time_cost] += 1
                 else:
                     time_cost_counts[ant.total_time_cost] = 1
-            ant_index = ant_index + 1
+            ant_index += 1
 
         current_best_ant = self.find_best_path(ants_found_below, destination_edge,
                                                total_pheromones)  # based on pheromone level
@@ -459,14 +459,14 @@ class Optimization:
         best_time_cost = current_best_ant.total_time_cost
         best_distance_cost = current_best_ant.path_length
 
-        # if (iteration + 1) % log_interval == 0 or iteration == number_of_iterations - 1:
-        #     print(
-        #         f"Iteration {iteration + 1}/{number_of_iterations}: Best Path = {best_path}, Time Cost = {best_time_cost}, Total Distance = {best_distance_cost}")
+        # if (iteration + 1) % log_interval == 0 or iteration == number_of_iterations - 1: print( f"Iteration {
+        # iteration + 1}/{number_of_iterations}: Best Path = {best_path}, Time Cost = {best_time_cost},
+        # Total Distance = {best_distance_cost}")
         if best_path is None:
             print("There's no route from start to destination.")
             return
         print(
             f"Best Path after all iterations: Best Path = {best_path}, Time Cost = {best_time_cost}, Total Distance = {best_distance_cost}")
-        print(self.find_optimal_and_suboptimal_path(ants_found))
+        # print(self.find_optimal_and_suboptimal_path(ants_found))
         self.visualization(time_costs, number_of_ants)
         return best_path
