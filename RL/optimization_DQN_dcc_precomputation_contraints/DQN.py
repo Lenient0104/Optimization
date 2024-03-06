@@ -9,25 +9,22 @@ from optimization import Optimization
 
 
 class Environment:
-    def __init__(self, graph, source, destination, initial_energy=100):
+    def __init__(self, graph, source, destination):
         self.graph = graph
         self.source = source
         self.destination = destination
         self.current_node = source
-        self.remaining_energy = initial_energy
-        self.initial_energy = initial_energy
         self.reset()
 
     def reset(self):
         self.current_node = self.source
-        self.remaining_energy = self.initial_energy
         return self._get_state()
 
-    def _get_state(self):
+    def _get_state(self, mode):
         # State representation could be more complex depending on your exact scenario
         # Here, it's simplified as a vector containing the current node and remaining energy
         current_node_index = list(self.graph.nodes).index(self.current_node)
-        state = np.array([current_node_index, self.remaining_energy])
+        state = np.array([current_node_index])
         return state
 
     def step(self, action):
@@ -93,6 +90,7 @@ class DQNAgent:
                  min_epsilon=0.01, buffer_size=10000, batch_size=64):
         self.state_dim = state_dim
         self.action_dim = action_dim
+        # Experiences memory
         self.memory = deque(maxlen=buffer_size)
         self.batch_size = batch_size
 
@@ -111,9 +109,11 @@ class DQNAgent:
         self.loss_fn = nn.MSELoss()
 
     def remember(self, state, action, reward, next_state, done):
+        # recording
         self.memory.append((state, action, reward, next_state, done))
 
     def act(self, state):
+        # Explore and Exploitation
         if np.random.rand() < self.epsilon:
             return random.randrange(self.action_dim)
         state = torch.FloatTensor(state).unsqueeze(0)
