@@ -11,7 +11,7 @@ class Analysis(unittest.TestCase):
         self.source_edge = '3789374#3'
         self.target_edge = "-361450282"
         self.start_mode = 'walking'
-        self.ant_num = [100, 150, 200, 250, 300]
+        self.ant_num = [100, 125, 150, 175, 200, 250, 300]
         self.iteration = 1
         self.db_path = 'test_new.db'
         self.user = User(60, True, 0, 20)
@@ -23,15 +23,55 @@ class Analysis(unittest.TestCase):
         graph = optimizer_interface.new_graph
 
         aco_time_costs = []
+        aco_exe_time = []
         for ant_num in self.ant_num:
-            path, time_cost = optimizer_interface.run_aco_algorithm(self.source_edge, self.target_edge, ant_num,
-                                                                    self.iteration)
+            path, time_cost, ex_time = optimizer_interface.run_aco_algorithm(self.source_edge, self.target_edge, ant_num,
+                                                                             self.iteration)
             aco_time_costs.append(time_cost)
+            aco_exe_time.append(ex_time)
 
-        RL_agent = MultiModalQLearningAgent(graph)
-        RL_agent.learn(self.source_edge, self.target_edge)
-        RL_time_cost = RL_agent.print_optimal_route(self.source_edge, self.target_edge)
-        self.visual_comparison(aco_time_costs, RL_time_cost)
+        print("exe time \n", aco_exe_time)
+        print("time costs \n", aco_time_costs)
+
+        self.plot_aco_performance_3d(self.ant_num, aco_time_costs, aco_exe_time)
+
+    def plot_aco_performance_3d(self, ant_nums, aco_time_costs, aco_exe_time):
+        fig = plt.figure(figsize=(12, 8))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Set labels for axes
+        ax.set_xlabel('Number of Ants')
+        ax.set_ylabel('Execution Time (seconds)')
+        ax.set_zlabel('Time Cost (seconds)')
+
+        # Plotting the data points
+        ax.scatter(ant_nums, aco_exe_time, aco_time_costs, color='red', s=100, label='ACO Performance')
+
+        # Connect the main nodes with a line
+        ax.plot(ant_nums, aco_exe_time, aco_time_costs, color='black', linewidth=2)
+
+        # Ensure ant_nums is a list of integers if it's not already
+        ant_nums_int = [int(ant) for ant in ant_nums]
+
+        # Then set the x-ticks to the ant_nums list
+        # ax.set_xticks(ant_nums_int)
+        # ax.set_xticklabels(ant_nums_int)
+
+        # Drawing lines to the axes and marking the intersection points
+        for x, y, z in zip(ant_nums, aco_exe_time, aco_time_costs):
+            ax.plot([x, x], [y, y], [0, z], 'gray', linestyle='--', alpha=0.5)  # Line to z-axis
+            ax.plot([0, x], [y, y], [z, z], 'gray', linestyle='--', alpha=0.5)  # Line to x-axis
+            ax.scatter([0], [y], [z], color='blue', s=15)  # Mark on y-axis plane
+            ax.scatter([x], [y], [0], color='blue', s=15)  # Mark on z-axis plane
+
+        # Set the view angle for better visualization
+        # ax.view_init(elev=20, azim=-35)
+
+        print(ax.get_xlim(), ax.get_ylim(), ax)
+
+        plt.title("ACO Performance: Execution Time and Time Cost vs. Number of Ants")
+        plt.legend()
+        plt.show()
 
     def visual_comparison(self, aco_time_costs, RL_time_cost):
         time_differences = []
@@ -40,7 +80,8 @@ class Analysis(unittest.TestCase):
 
         plt.figure(figsize=(10, 6))
         plt.plot(self.ant_num, time_differences)
-        plt.title("Time costs difference between RL optimizer and ACO optimizer over number of Ants Used")
+        plt.title("Optimality of Objective Value difference between RL optimizer and ACO optimizer over number of "
+                  "Ants Used")
         plt.xlabel("Number of Ants")
         plt.ylabel("Time Cost Difference (seconds)")
         plt.savefig("comparison")

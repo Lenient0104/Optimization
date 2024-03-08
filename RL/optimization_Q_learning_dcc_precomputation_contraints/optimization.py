@@ -18,7 +18,7 @@ from e_car import ECar_EnergyConsumptionModel
 from e_bike import Ebike_PowerConsumptionCalculator
 from e_scooter import Escooter_PowerConsumptionCalculator
 
-matplotlib.use('TkAgg')  # Use Tkinter backend
+# matplotlib.use('TkAgg')  # Use Tkinter backend
 
 
 class Optimization:
@@ -424,6 +424,13 @@ class Optimization:
         # self.visualize_paths_graph(paths_graph)
         return paths_graph
 
+    def reset_graph(self):
+        # Iterate over all edges in the graph
+        for u, v, key in self.new_graph.edges(keys=True):
+            # Reset the pheromone_level for each edge
+            self.new_graph[u][v][key]['pheromone_level'] = 0.1
+        print("Graph has been reset with updated pheromone levels.")
+
     def visualize_paths_graph_interactive(self, paths_graph, start_node, end_node):
         # Initialize the Network object with cdn_resources set to 'remote' for better compatibility
         nt = Network(notebook=True, height="750px", width="100%", bgcolor="#222222", font_color="white",
@@ -553,6 +560,7 @@ class Optimization:
         return best_ant
 
     def run_aco_algorithm(self, start_edge, destination_edge, number_of_ants, number_of_iterations, mode='walking'):
+        start_time = time.time()
         if start_edge not in self.unique_edges:
             print(f"There's no edge {start_edge} in this map.")
             return
@@ -612,7 +620,7 @@ class Optimization:
                 else:
                     time_cost_counts[ant.total_time_cost] = 1
             ant_index += 1
-
+        self.reset_graph()
         current_best_ant = self.find_best_path(ants, destination_edge, total_pheromones)  # based on pheromone level
         best_path = current_best_ant.path
         best_time_cost = current_best_ant.total_time_cost
@@ -626,8 +634,10 @@ class Optimization:
             return
         print(
             f"Best Path after all iterations: Best Path = {best_path}, Time Cost = {best_time_cost} seconds")
+        end_time = time.time()
+        exe_time = end_time - start_time
         self.visualization(time_costs, number_of_ants)
-        return best_path, best_time_cost
+        return best_path, best_time_cost, exe_time
 
     def visualization(self, time_cost, ant_num):
         # Generating the iteration numbers
