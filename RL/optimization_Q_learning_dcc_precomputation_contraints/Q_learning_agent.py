@@ -44,8 +44,6 @@ class MultiModalQLearningAgent:
             distance = self.graph[state][next_state][mode]['weight']
             energy_consumed = self.calculate_energy_comsumption(mode, distance)
             # Assuming current_energy is the current energy level of the vehicle
-            if current_energy - energy_consumed < 0:
-                print("hehe")
             if current_energy - energy_consumed >= 0:  # Check if the action is feasible
                 feasible_actions.append(action)
 

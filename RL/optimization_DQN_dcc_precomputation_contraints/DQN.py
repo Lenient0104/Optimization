@@ -213,6 +213,9 @@ action_dim = max(
 
 agent = DQNAgent(state_dim, action_dim)
 
+best_route = None
+best_total_reward = float('-inf')
+
 # Training loop
 for episode in range(100):  # Adjust the range as necessary for your training needs
     state = env.reset()
@@ -236,10 +239,14 @@ for episode in range(100):  # Adjust the range as necessary for your training ne
         if done:
             agent.update_target_model()
 
+    if total_reward > best_total_reward:
+        best_total_reward = total_reward
+        best_route = route.copy()
+
     if len(agent.memory) > 32:
         agent.replay()
 
-    # Construct a readable string of the route with modes
-    route_with_modes = " -> ".join([f"{node}({mode})" for node, mode in zip(route, modes_used)])
-    print(f"Episode {episode + 1}: Total Reward: {total_reward}, Route: {route_with_modes}")
+# Construct a readable string of the best route with modes
+best_route_with_modes = " -> ".join([f"{node}({mode})" for node, mode in zip(best_route, modes_used)])
+print(f"Best Route: {best_route_with_modes}, Total Reward: {best_total_reward}")
 

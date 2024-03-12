@@ -33,7 +33,8 @@ class Analysis(unittest.TestCase):
         print("exe time \n", aco_exe_time)
         print("time costs \n", aco_time_costs)
 
-        self.plot_aco_performance_3d(self.ant_num, aco_time_costs, aco_exe_time)
+        # self.plot_aco_performance_3d(self.ant_num, aco_time_costs, aco_exe_time)
+        self.plot_aco_performance_2d(self.ant_num, aco_time_costs, aco_exe_time)
 
     def plot_aco_performance_3d(self, ant_nums, aco_time_costs, aco_exe_time):
         fig = plt.figure(figsize=(12, 8))
@@ -44,21 +45,21 @@ class Analysis(unittest.TestCase):
         ax.set_ylabel('Execution Time (seconds)')
         ax.set_zlabel('Time Cost (seconds)')
 
-        # Plotting the data points
-        ax.scatter(ant_nums, aco_exe_time, aco_time_costs, color='red', s=100, label='ACO Performance')
-
-        # Connect the main nodes with a line
-        ax.plot(ant_nums, aco_exe_time, aco_time_costs, color='black', linewidth=2)
-
         # Ensure ant_nums is a list of integers if it's not already
         ant_nums_int = [int(ant) for ant in ant_nums]
 
+        # Plotting the data points
+        ax.scatter(ant_nums_int, aco_exe_time, aco_time_costs, color='red', s=100, label='ACO Performance')
+
+        # Connect the main nodes with a line
+        ax.plot(ant_nums_int, aco_exe_time, aco_time_costs, color='black', linewidth=2)
+
         # Then set the x-ticks to the ant_nums list
-        # ax.set_xticks(ant_nums_int)
-        # ax.set_xticklabels(ant_nums_int)
+        ax.set_xticks(ant_nums_int)
+        ax.set_xticklabels(ant_nums_int)
 
         # Drawing lines to the axes and marking the intersection points
-        for x, y, z in zip(ant_nums, aco_exe_time, aco_time_costs):
+        for x, y, z in zip(ant_nums_int, aco_exe_time, aco_time_costs):
             ax.plot([x, x], [y, y], [0, z], 'gray', linestyle='--', alpha=0.5)  # Line to z-axis
             ax.plot([0, x], [y, y], [z, z], 'gray', linestyle='--', alpha=0.5)  # Line to x-axis
             ax.scatter([0], [y], [z], color='blue', s=15)  # Mark on y-axis plane
@@ -71,6 +72,31 @@ class Analysis(unittest.TestCase):
 
         plt.title("ACO Performance: Execution Time and Time Cost vs. Number of Ants")
         plt.legend()
+        plt.show()
+
+    def plot_aco_performance_2d(self, ant_nums, aco_time_costs, aco_exe_time):
+        # Creating subplots with 2 rows and 1 column
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 15))  # Increase the figure size if necessary
+
+        # Plotting execution time against number of ants
+        ax1.plot(ant_nums, aco_exe_time, 'ro-', label='Execution Time')
+        ax1.set_xlabel('Number of Ants')
+        ax1.set_ylabel('Execution Time (seconds)')
+        ax1.set_title('ACO Performance: Execution Time vs. Number of Ants')
+        ax1.legend()
+        ax1.grid(True)
+
+        # Plotting time cost against number of ants
+        ax2.plot(ant_nums, aco_time_costs, 'bs-', label='Time Cost')
+        ax2.set_xlabel('Number of Ants')
+        ax2.set_ylabel('Time Cost (seconds)')
+        ax2.set_title('ACO Performance: Optimality of Objective Value vs. Number of Ants')
+        ax2.legend()
+        ax2.grid(True)
+
+        # Adjust layout to prevent overlap
+        plt.subplots_adjust(hspace=1.5)  # Adjust the horizontal spacing
+        # plt.tight_layout()
         plt.show()
 
     def visual_comparison(self, aco_time_costs, RL_time_cost):

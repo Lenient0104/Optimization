@@ -504,7 +504,7 @@ class Optimization:
 
         plt.title("Shortest Paths Graph Visualization")
         plt.axis('off')  # Hide axes
-        plt.show()
+        # plt.show()
 
     def pre_computation(self, source, end):
         print("The path between station edges:")
@@ -636,7 +636,7 @@ class Optimization:
             f"Best Path after all iterations: Best Path = {best_path}, Time Cost = {best_time_cost} seconds")
         end_time = time.time()
         exe_time = end_time - start_time
-        self.visualization(time_costs, number_of_ants)
+        # self.visualization(time_costs, number_of_ants)
         return best_path, best_time_cost, exe_time
 
     def visualization(self, time_cost, ant_num):
