@@ -8,8 +8,8 @@ class TestOptimization(unittest.TestCase):
 
     def setUp(self):
         self.net_xml_path = 'DCC.net.xml'
-        self.source_edge = '147077493#0'
-        self.target_edge = "372256221"
+        self.source_edge = '361450282'
+        self.target_edge = "-110407380#1"
         self.start_mode = 'walking'
         self.ant_num = [100, 150, 200, 250, 300]
         self.iteration = 1

@@ -145,7 +145,7 @@ class Ant:
                 if edge_data['mode'] == mode:
                     # Update pheromone level only if the mode matches
                     self.graph.edges[current_edge, previous_edge][edge_data]['pheronmone_level'] = (
-                                                                                                               1 - evaporation_rate) * penalty_factor
+                                                                                                           1 - evaporation_rate) * penalty_factor
 
     # need changing
     def calculate_move_probabilities(self, next_moves, change_device_probability, walking_preference):
@@ -170,14 +170,14 @@ class Ant:
             # same mode
             if current_mode != 'walking' and not has_current_station and mode == current_mode:
                 pheromone_level = graph.get_edge_data(current_loc, next_edge, key=mode)['pheromone_level']
-                probability = pheromone_level
+                probability = pheromone_level * 0.01
                 probabilities[next_move] = probability
                 continue
             # we are walking and there's no station for change, and we found the next move is walking which is what
             # we want
             if current_mode == 'walking' and not self.has_station(next_edge) and mode == current_mode:
                 pheromone_level = graph.get_edge_data(current_loc, next_edge, key=mode)['pheromone_level']
-                probability = pheromone_level
+                probability = pheromone_level * 0.01
                 probabilities[next_move] = probability
                 continue
             # we are not walking but the next edge doesn't have current station, so keep going
@@ -263,15 +263,15 @@ class Ant:
             return "pedestrian", "pedestrian"
         if mode == 'e_bike_1':
             e_bike_id = 'eb' + str(random.randint(0, 10))
-            soc = random.randint(70, 100)
+            soc = random.randint(90, 100)
             return e_bike_id, soc
         elif mode == 'e_scooter_1':
             e_scooter_id = 'es' + str(random.randint(0, 10))
-            soc = random.randint(70, 100)
+            soc = random.randint(90, 100)
             return e_scooter_id, soc
         elif mode == 'e_car':
             e_car_id = 'ec' + str(random.randint(0, 10))
-            soc = random.randint(70, 100)
+            soc = random.randint(90, 100)
             return e_car_id, soc
 
     def calculate_energy_comsumption(self, current_mode, distance):

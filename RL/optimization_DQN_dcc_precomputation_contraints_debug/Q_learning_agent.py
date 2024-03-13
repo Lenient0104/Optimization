@@ -1,14 +1,11 @@
 import random
-import time as tm
-
-from matplotlib import pyplot as plt
-
+import time
 from user_info import User
 from optimization import Optimization
 
 
 class MultiModalQLearningAgent:
-    def __init__(self, graph, alpha=0.1, gamma=0.95, epsilon=1.0, epsilon_decay=0.99, min_epsilon=0.01):
+    def __init__(self, graph, alpha=0.1, gamma=0.95, epsilon=1.0, epsilon_decay=0.8, min_epsilon=0.01):
         self.graph = graph
         self.alpha = alpha  # Learning rate
         self.gamma = gamma  # Discount factor
@@ -94,8 +91,10 @@ class MultiModalQLearningAgent:
         # Decay epsilon to reduce exploration over time
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
-    def learn(self, start, destination, episodes=500, progress_check_interval=100, initial_energy=100):
+    def learn(self, start, destination, episodes, progress_check_interval=100, initial_energy=100):
+
         for episode in range(1, episodes + 1):
+
             current_state = start
             current_energy = initial_energy  # Initialize the energy level for the vehicle at the start of the episode
             last_mode = None  # Track the last mode used
@@ -184,47 +183,14 @@ if __name__ == '__main__':
     target_edge = "-110407380#1"
     start_mode = 'walking'
     db_path = 'test_new.db'
+    episodes = 500
     user = User(60, False, 0, 20)
-    Q_times = []
-    Q_exe_times = []
-    for i in range(1, 6):
-        optimizer = Optimization(net_xml_path, user, db_path, source_edge, target_edge)
-        graph = optimizer.new_graph
-        agent = MultiModalQLearningAgent(graph)
-        start_time = tm.time()
-        agent.learn(source_edge, target_edge)
-        end_time = tm.time()
-        print(f"Total time: {end_time - start_time} seconds")
-        time, _ = agent.print_optimal_route(source_edge, target_edge)
-        Q_times.append(time)
-        Q_exe_times.append(end_time - start_time)
 
-    plt.rcParams.update({'font.size': 14})  # Adjust font size globally for the plot
-
-    # Creating subplots with 2 rows and 1 column
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
-
-    # Plotting execution time against number of ants
-    ax1.plot([1, 2, 3, 4, 5], Q_exe_times, 'ro-', label='Execution Time')
-    ax1.set_xlabel('Number of Episodes', fontsize=16)
-    ax1.set_ylabel('Execution Time (seconds)', fontsize=16)
-    ax1.set_title('Q-learning Performance: Execution Time vs. Number of Episodes', fontsize=18)
-    ax1.tick_params(axis='both', which='major', labelsize=14)
-    ax1.legend()
-    ax1.grid(True)
-
-    # Plotting time cost against number of ants
-    ax2.plot([1, 2, 3, 4, 5], Q_times, 'bs-', label='Time Cost')
-    ax2.axhline(y=3084.136579657965, color='g', linestyle='--', label='Reference Value')
-    ax2.set_xlabel('Number of Episodes', fontsize=16)
-    ax2.set_ylabel('Time Cost (seconds)', fontsize=16)
-    ax2.set_title('Q_learning Performance: Time Cost vs. Number of Episodes', fontsize=18)
-    ax2.tick_params(axis='both', which='major', labelsize=14)
-    ax2.legend()
-    ax2.grid(True)
-
-    # Adjust layout to prevent overlap
-    plt.subplots_adjust(hspace=0.3)
-    plt.tight_layout()
-    plt.show()
-
+    optimizer = Optimization(net_xml_path, user, db_path, source_edge, target_edge)
+    graph = optimizer.new_graph
+    agent = MultiModalQLearningAgent(graph)
+    start_time = time.time()
+    agent.learn(source_edge, target_edge, episodes)
+    end_time = time.time()
+    print(f"Total time: {end_time - start_time} seconds")
+    time = agent.print_optimal_route(source_edge, target_edge)

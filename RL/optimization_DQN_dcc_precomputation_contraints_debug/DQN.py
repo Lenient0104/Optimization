@@ -40,7 +40,7 @@ class Environment:
         if not possible_actions or action_index >= len(possible_actions):
             # Invalid action chosen or no actions available; penalize heavily
             info = {'current_node': self.current_node, 'mode': self.last_mode, 'action_taken': 'None'}
-            return self._get_state(), -100000, True, info  # Now includes info
+            return self._get_state(), -10000, True, info  # Now includes info
 
 
         # Select the action based on the action_index
@@ -64,7 +64,7 @@ class Environment:
         if self.remaining_energy - energy_consumed < 0:
             # Action not feasible due to energy constraint
             info = {'current_node': self.current_node, 'mode': mode, 'action_taken': 'Insufficient energy'}
-            return self._get_state(), -100000, True, info  # Now includes info
+            return self._get_state(), -10000, True, info  # Now includes info
 
         # Update energy and current node as the action is feasible
         self.remaining_energy -= energy_consumed
@@ -199,8 +199,8 @@ class DQNAgent:
 
 # Initialize your environment
 net_xml_path = 'DCC.net.xml'
-source_edge = '3789374#3'
-destination_edge = '-29554175#0'
+source_edge = '361450282'
+destination_edge = "-110407380#1"
 user = User(60, False, 0, 20)
 optimizer = Optimization(net_xml_path, user, 'test_new.db', source_edge, destination_edge)
 graph = optimizer.new_graph

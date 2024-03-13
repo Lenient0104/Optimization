@@ -16,6 +16,7 @@ from e_car import ECar_EnergyConsumptionModel
 from e_bike import Ebike_PowerConsumptionCalculator
 from e_scooter import Escooter_PowerConsumptionCalculator
 
+
 # matplotlib.use('TkAgg')  # Use Tkinter backend
 
 
@@ -166,7 +167,8 @@ class Optimization:
         #     # Choose at least one e-mobility station type for this edge
         #     e_mobility_stations = random.sample(['e_bike_1', 'e_scooter_1', 'e_car'], k=3)
         #     edge_stations[edge_id] = ['walking'] + e_mobility_stations
-
+        edge_to_assign = ['361409608#3', '3791905#2', '-11685016#2', '369154722#2', '244844370#', '37721356#0',
+                          '74233405#1', '129774671#0', '38192817', '-64270141']
         indices_to_assign = [50, 89, 112, 256, 309, 4000, 503, 8000, 30000, 10000]
         e_mobility_stations = user.preference
         if not user.driving_license and 'e_car' in user.preference:
@@ -526,7 +528,7 @@ class Optimization:
                                                                 0)  # Get current level, default to 0 if not set
                         # Update pheromone level
                         updated_pheromone_level = current_pheromone_level + self.pheromone_deposit_function(
-                            ant.total_time_cost) * 100000
+                            ant.total_time_cost) * 10000
                         # Set the updated pheromone level back on the edge
                         self.new_graph[edge_1][edge_2][key]['pheromone_level'] = updated_pheromone_level
 
@@ -551,6 +553,7 @@ class Optimization:
         return best_ant
 
     def run_aco_algorithm(self, start_edge, destination_edge, number_of_ants, number_of_iterations, mode='walking'):
+        start_time = time.time()
         if start_edge not in self.unique_edges:
             print(f"There's no edge {start_edge} in this map.")
             return
@@ -571,6 +574,8 @@ class Optimization:
         max_pheromone = 0
         time_costs = []
         time_cost_counts = {}
+        flag = False
+        exe_time = 0
 
         # print(self.edges_station)
         for ant_num in range(number_of_ants):
@@ -604,6 +609,12 @@ class Optimization:
                     total_pheromone = self.update_pheromones(ant)
                     total_pheromones[ant] = total_pheromone
                     print("updated")
+                    if len(time_costs) >= 4 and (
+                            time_costs[len(time_costs) - 1] == time_costs[len(time_costs) - 2]
+                            == time_costs[len(time_costs) - 3] == time_costs[len(time_costs) - 4]):
+                        end_time = time.time()
+                        exe_time = end_time - start_time
+                        flag = True
                 # Count the occurrence of the time cost
                 if ant.total_time_cost in time_cost_counts:
                     time_cost_counts[ant.total_time_cost] += 1
@@ -624,8 +635,11 @@ class Optimization:
             return
         print(
             f"Best Path after all iterations: Best Path = {best_path}, Time Cost = {best_time_cost} seconds")
-        self.visualization(time_costs, number_of_ants)
-        return best_path, best_time_cost
+        if not flag:
+            end_time = time.time()
+            exe_time = end_time - start_time
+        # self.visualization(time_costs, number_of_ants)
+        return best_path, best_time_cost, exe_time
 
     def reset_graph(self):
         # Iterate over all edges in the graph
