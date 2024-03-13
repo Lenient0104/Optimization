@@ -94,7 +94,7 @@ class MultiModalQLearningAgent:
         # Decay epsilon to reduce exploration over time
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
-    def learn(self, start, destination, episodes=500, progress_check_interval=100, initial_energy=100):
+    def learn(self, start, destination, episodes, progress_check_interval=100, initial_energy=100):
         for episode in range(1, episodes + 1):
             current_state = start
             current_energy = initial_energy  # Initialize the energy level for the vehicle at the start of the episode
@@ -185,14 +185,15 @@ if __name__ == '__main__':
     start_mode = 'walking'
     db_path = 'test_new.db'
     user = User(60, False, 0, 20)
+    episodes = [100, 500, 1000, 1500, 2000]
     Q_times = []
     Q_exe_times = []
-    for i in range(1, 6):
+    for episode in episodes:
         optimizer = Optimization(net_xml_path, user, db_path, source_edge, target_edge)
         graph = optimizer.new_graph
         agent = MultiModalQLearningAgent(graph)
         start_time = tm.time()
-        agent.learn(source_edge, target_edge)
+        agent.learn(source_edge, target_edge, episode)
         end_time = tm.time()
         print(f"Total time: {end_time - start_time} seconds")
         time, _ = agent.print_optimal_route(source_edge, target_edge)
@@ -205,7 +206,7 @@ if __name__ == '__main__':
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
 
     # Plotting execution time against number of ants
-    ax1.plot([1, 2, 3, 4, 5], Q_exe_times, 'ro-', label='Execution Time')
+    ax1.plot(episodes, Q_exe_times, 'ro-', label='Execution Time')
     ax1.set_xlabel('Number of Episodes', fontsize=16)
     ax1.set_ylabel('Execution Time (seconds)', fontsize=16)
     ax1.set_title('Q-learning Performance: Execution Time vs. Number of Episodes', fontsize=18)
@@ -214,7 +215,7 @@ if __name__ == '__main__':
     ax1.grid(True)
 
     # Plotting time cost against number of ants
-    ax2.plot([1, 2, 3, 4, 5], Q_times, 'bs-', label='Time Cost')
+    ax2.plot(episodes, Q_times, 'bs-', label='Time Cost')
     ax2.axhline(y=3084.136579657965, color='g', linestyle='--', label='Reference Value')
     ax2.set_xlabel('Number of Episodes', fontsize=16)
     ax2.set_ylabel('Time Cost (seconds)', fontsize=16)
