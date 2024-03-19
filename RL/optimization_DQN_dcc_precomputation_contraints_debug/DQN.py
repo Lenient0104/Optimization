@@ -22,12 +22,10 @@ class Environment:
     def reset(self):
         self.current_node = self.source
         self.remaining_energy = self.initial_energy  # Reset remaining energy
-        self.last_mode = None  # Reset the last mode used
+        self.last_mode = 'walking'  # Reset the last mode used
         return self._get_state()
 
     def _get_state(self):
-        # State representation could be more complex depending on your exact scenario
-        # Here, it's simplified as a vector containing the current node and remaining energy
         current_node_index = list(self.graph.nodes).index(self.current_node)
         state = np.array([current_node_index])
         return state
@@ -37,10 +35,11 @@ class Environment:
         possible_actions = [(neighbor, key, data) for neighbor in self.graph.neighbors(self.current_node)
                             for key, data in self.graph[self.current_node][neighbor].items()]
 
+
         if not possible_actions or action_index >= len(possible_actions):
             # Invalid action chosen or no actions available; penalize heavily
             info = {'current_node': self.current_node, 'mode': self.last_mode, 'action_taken': 'None'}
-            return self._get_state(), -10000, True, info  # Now includes info
+            return self._get_state(), -10000, False, info  # Now includes info
 
 
         # Select the action based on the action_index
@@ -58,14 +57,15 @@ class Environment:
         # Check for mode transfer and refill energy if there's a change in mode
         if mode != self.last_mode and self.last_mode is not None:
             self.remaining_energy = 100  # Refill energy on mode transfer
-        self.last_mode = mode  # Update the last mode used
 
         # Check if the action is feasible within the energy constraint
         if self.remaining_energy - energy_consumed < 0:
-            # Action not feasible due to energy constraint
-            info = {'current_node': self.current_node, 'mode': mode, 'action_taken': 'Insufficient energy'}
-            return self._get_state(), -10000, True, info  # Now includes info
+            # Action not feasible due to energy constraint, so don't change mode
+            info = {'current_node': self.current_node, 'mode': self.last_mode, 'action_taken': 'Insufficient energy'}
+            return self._get_state(), -10000, False, info  # Now includes info
 
+
+        self.last_mode = mode  # Update the last mode used
         # Update energy and current node as the action is feasible
         self.remaining_energy -= energy_consumed
         self.current_node = next_node
@@ -74,30 +74,31 @@ class Environment:
         reward = -time_cost
 
         # Check if the destination has been reached
-        done = next_node == self.destination
+        done = self.current_node == self.destination
+
 
 
         info = {
             'current_node': self.current_node,  # Assuming self.current_node tracks the current position
-            'mode': mode,
+            'mode': self.last_mode,
             'action_taken': action  # Including the action taken can be useful for debugging
             # Add any other info you might find relevant
         }
 
         return self._get_state(), reward, done, info
 
-    def update_state_energy_and_check_done(self, next_node, energy_consumed):
-        # Update the environment's current node and remaining energy
-        self.current_node = next_node
-        self.remaining_energy -= energy_consumed
-
-        # Check if the destination is reached or energy is depleted
-        if next_node == self.destination:
-            return 100, True  # Reward for reaching the destination
-        elif self.remaining_energy <= 0:
-            return -100, True  # Penalty for depleting energy
-
-        return -1, False  # Standard step penalty to encourage efficiency
+    # def update_state_energy_and_check_done(self, next_node, energy_consumed):
+    #     # Update the environment's current node and remaining energy
+    #     self.current_node = next_node
+    #     self.remaining_energy -= energy_consumed
+    #
+    #     # Check if the destination is reached or energy is depleted
+    #     if next_node == self.destination:
+    #         return 100, True  # Reward for reaching the destination
+    #     elif self.remaining_energy <= 0:
+    #         return -100, True  # Penalty for depleting energy
+    #
+    #     return -1, False  # Standard step penalty to encourage efficiency
 
     def calculate_energy_comsumption(self, current_mode, distance):
         if current_mode == 'walking':
@@ -213,16 +214,17 @@ action_dim = max(
 
 agent = DQNAgent(state_dim, action_dim)
 
-best_route = None
+best_route = []
+best_modes_used = []
 best_total_reward = float('-inf')
 
 # Training loop
-for episode in range(100):  # Adjust the range as necessary for your training needs
+for episode in range(500):  # Adjust the range as necessary for your training needs
     state = env.reset()
     total_reward = 0
     done = False
-    route = []  # Initialize an empty route
-    modes_used = []  # Track modes used for each step in the route
+    route = [source_edge]  # Initialize an empty route
+    modes_used = ['walking']  # Track modes used for each step in the route
 
     while not done:
         action = agent.act(state)
@@ -239,14 +241,18 @@ for episode in range(100):  # Adjust the range as necessary for your training ne
         if done:
             agent.update_target_model()
 
-    if total_reward > best_total_reward:
+    if total_reward > best_total_reward and route[-1] == destination_edge:
         best_total_reward = total_reward
         best_route = route.copy()
+        best_modes_used = modes_used.copy()
 
     if len(agent.memory) > 32:
         agent.replay()
 
+print(len(best_modes_used))
+print(len(best_route))
+
 # Construct a readable string of the best route with modes
-best_route_with_modes = " -> ".join([f"{node}({mode})" for node, mode in zip(best_route, modes_used)])
+best_route_with_modes = " -> ".join([f"{node}({mode})" for node, mode in zip(best_route, best_modes_used)])
 print(f"Best Route: {best_route_with_modes}, Total Reward: {best_total_reward}")
 
