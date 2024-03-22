@@ -1,9 +1,14 @@
+import time
+
 import torch
 import random
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 from collections import deque
+
+from matplotlib import pyplot as plt
+
 from user_info import User
 from optimization import Optimization
 
@@ -214,45 +219,79 @@ action_dim = max(
 
 agent = DQNAgent(state_dim, action_dim)
 
-best_route = []
-best_modes_used = []
-best_total_reward = float('-inf')
+# Define episodes
+episodes = [800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100]
+test_size = 30
 
-# Training loop
-for episode in range(500):  # Adjust the range as necessary for your training needs
-    state = env.reset()
-    total_reward = 0
-    done = False
-    route = [source_edge]  # Initialize an empty route
-    modes_used = ['walking']  # Track modes used for each step in the route
+# Lists to store average rewards and execution times
+avg_rewards = []
+avg_exe_times = []
 
-    while not done:
-        action = agent.act(state)
-        next_state, reward, done, info = env.step(action)
+# Perform experiments
+for episode_count in episodes:
+    print(episode_count)
+    total_rewards = []
+    exe_times = []
+    for _ in range(test_size):  # Run 30 times for each episode count
+        start_time = time.time()
+        best_total_reward = float('-inf')
 
-        # Append current node and mode to their respective lists
-        route.append(info['current_node'])
-        modes_used.append(info['mode'])
+        for episode in range(episode_count):
+            state = env.reset()
+            total_reward = 0
+            done = False
+            route = [source_edge]  # Initialize an empty route
+            modes_used = ['walking']  # Track modes used for each step in the route
 
-        agent.remember(state, action, reward, next_state, done)
-        state = next_state
-        total_reward += reward
+            while not done:
+                action = agent.act(state)
+                next_state, reward, done, info = env.step(action)
 
-        if done:
-            agent.update_target_model()
+                # Append current node and mode to their respective lists
+                route.append(info['current_node'])
+                modes_used.append(info['mode'])
 
-    if total_reward > best_total_reward and route[-1] == destination_edge:
-        best_total_reward = total_reward
-        best_route = route.copy()
-        best_modes_used = modes_used.copy()
+                agent.remember(state, action, reward, next_state, done)
+                state = next_state
+                total_reward += reward
 
-    if len(agent.memory) > 32:
-        agent.replay()
+                if done:
+                    agent.update_target_model()
 
-print(len(best_modes_used))
-print(len(best_route))
+            if total_reward > best_total_reward and route[-1] == destination_edge:
+                best_total_reward = total_reward
 
-# Construct a readable string of the best route with modes
-best_route_with_modes = " -> ".join([f"{node}({mode})" for node, mode in zip(best_route, best_modes_used)])
-print(f"Best Route: {best_route_with_modes}, Total Reward: {best_total_reward}")
+            if len(agent.memory) > 32:
+                agent.replay()
+
+        total_rewards.append(best_total_reward)
+        exe_times.append(time.time() - start_time)
+
+    avg_rewards.append(-np.mean(total_rewards))  # Taking the negative mean of rewards
+    avg_exe_times.append(np.mean(exe_times))
+
+# Creating subplots with 2 rows and 1 column
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+
+# Plotting execution time against number of episodes
+ax1.plot(episodes, avg_exe_times, 'ro-', label='Execution Time')
+ax1.set_xlabel('Number of Episodes', fontsize=16)
+ax1.set_ylabel('Execution Time (seconds)', fontsize=16)
+ax1.set_title('DQN Performance: Execution Time vs. Number of Episodes', fontsize=18)
+ax1.tick_params(axis='both', which='major', labelsize=14)
+ax1.legend()
+ax1.grid(True)
+
+# Plotting average rewards against number of episodes
+ax2.plot(episodes, avg_rewards, 'bs-', label='Average Reward')
+ax2.axhline(y=3084.136579657965, color='g', linestyle='--', label='Reference Value')
+ax2.set_xlabel('Number of Episodes', fontsize=16)
+ax2.set_ylabel('Average time costs (s)', fontsize=16)
+ax2.set_title('DQN Performance: Average Reward vs. Number of Episodes', fontsize=18)
+ax2.tick_params(axis='both', which='major', labelsize=14)
+ax2.legend()
+ax2.grid(True)
+
+plt.tight_layout()
+plt.show()
 
