@@ -22,19 +22,19 @@ class Analysis(unittest.TestCase):
                                            self.target_edge)
         graph = optimizer_interface.new_graph
 
-        aco_time_costs = []
-        aco_exe_time = []
-        for ant_num in self.ant_num:
-            path, time_cost, ex_time = optimizer_interface.run_aco_algorithm(self.source_edge, self.target_edge, ant_num,
-                                                                             self.iteration)
-            aco_time_costs.append(time_cost)
-            aco_exe_time.append(ex_time)
-
-        print("exe time \n", aco_exe_time)
-        print("time costs \n", aco_time_costs)
-
-        # self.plot_aco_performance_3d(self.ant_num, aco_time_costs, aco_exe_time)
-        self.plot_aco_performance_2d(self.ant_num, aco_time_costs, aco_exe_time)
+        # aco_time_costs = []
+        # aco_exe_time = []
+        # for ant_num in self.ant_num:
+        #     path, time_cost, ex_time = optimizer_interface.run_aco_algorithm(self.source_edge, self.target_edge, ant_num,
+        #                                                                      self.iteration)
+        #     aco_time_costs.append(time_cost)
+        #     aco_exe_time.append(ex_time)
+        #
+        # print("exe time \n", aco_exe_time)
+        # print("time costs \n", aco_time_costs)
+        #
+        # # self.plot_aco_performance_3d(self.ant_num, aco_time_costs, aco_exe_time)
+        # self.plot_aco_performance_2d(self.ant_num, aco_time_costs, aco_exe_time)
 
     def plot_aco_performance_3d(self, ant_nums, aco_time_costs, aco_exe_time):
         fig = plt.figure(figsize=(12, 8))

@@ -217,10 +217,9 @@ state_dim = 1  # For example: [current_node_index]
 action_dim = max(
     len(list(graph.out_edges(node))) for node in graph.nodes)  # Max number of possible actions from any node
 
-agent = DQNAgent(state_dim, action_dim)
 
 # Define episodes
-episodes = [800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100]
+episodes = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
 test_size = 30
 
 # Lists to store average rewards and execution times
@@ -229,6 +228,7 @@ avg_exe_times = []
 
 # Perform experiments
 for episode_count in episodes:
+    agent = DQNAgent(state_dim, action_dim)
     print(episode_count)
     total_rewards = []
     exe_times = []

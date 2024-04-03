@@ -160,23 +160,15 @@ class Optimization:
     def get_stations(self, user):
         # Ensure all edges initially have just a 'walking' station
         edge_stations = {edge_id: ['walking'] for edge_id in self.unique_edges}
-        # num_edges_to_assign = min(len(self.unique_edges), 10)
-        # edges_to_assign = random.sample(self.unique_edges, num_edges_to_assign)
-        #
-        # for edge_id in edges_to_assign:
-        #     # Choose at least one e-mobility station type for this edge
-        #     e_mobility_stations = random.sample(['e_bike_1', 'e_scooter_1', 'e_car'], k=3)
-        #     edge_stations[edge_id] = ['walking'] + e_mobility_stations
-        edge_to_assign = ['361409608#3', '3791905#2', '-11685016#2', '369154722#2', '244844370#', '37721356#0',
+
+        edge_to_assign = ['361409608#3', '3791905#2', '-11685016#2', '369154722#2', '244844370#0', '37721356#0',
                           '74233405#1', '129774671#0', '38192817', '-64270141']
-        indices_to_assign = [50, 89, 112, 256, 309, 4000, 503, 8000, 30000, 10000]
+        # indices_to_assign = [50, 89, 112, 256, 309, 4000, 503, 8000, 30000, 10000]
         e_mobility_stations = user.preference
         if not user.driving_license and 'e_car' in user.preference:
             e_mobility_stations.remove('e_car')
-        for idx in indices_to_assign:
-            if idx < len(self.unique_edges):
-                edge_id = self.unique_edges[idx]
-                edge_stations[edge_id] = ['walking'] + e_mobility_stations
+        for edge_id in edge_to_assign:
+            edge_stations[edge_id] = ['walking'] + e_mobility_stations
         return edge_stations
 
     # need changing

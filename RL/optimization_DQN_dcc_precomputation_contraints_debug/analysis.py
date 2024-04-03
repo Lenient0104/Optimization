@@ -127,20 +127,6 @@ class Analysis(unittest.TestCase):
         plt.tight_layout()
         plt.show()
 
-    def visual_comparison(self, aco_time_costs, RL_time_cost):
-        time_differences = []
-        for aco_cost in aco_time_costs:
-            time_differences.append(aco_cost - RL_time_cost)
-
-        plt.figure(figsize=(10, 6))
-        plt.plot(self.ant_num, time_differences)
-        plt.title("Optimality of Objective Value difference between RL optimizer and ACO optimizer over number of "
-                  "Ants Used")
-        plt.xlabel("Number of Ants")
-        plt.ylabel("Time Cost Difference (seconds)")
-        plt.savefig("comparison")
-        # plt.show()
-
 
 if __name__ == '__main__':
     unittest.main()
