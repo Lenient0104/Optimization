@@ -14,6 +14,7 @@ class Analysis(unittest.TestCase):
         self.target_edge = "-110407380#1"
         self.start_mode = 'walking'
         self.ant_num = [100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000]
+        # self.ant_num = [100, 150]
         self.iteration = 1
         self.db_path = 'test_new.db'
         self.user = User(60, True, 0, 20)
@@ -45,32 +46,30 @@ class Analysis(unittest.TestCase):
     def plot_aco_performance_2d(self, ant_nums, all_aco_time_costs, all_aco_exe_times):
         plt.rcParams.update({'font.size': 14})
 
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(17, 15))
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
 
-        for idx, ant_num in enumerate(ant_nums):
-            # Calculate average values
-            avg_exe_time = statistics.mean(all_aco_exe_times[idx])
-            exe_time_diffs = [t - avg_exe_time for t in all_aco_exe_times[idx]]
-            avg_time_cost = statistics.mean(all_aco_time_costs[idx])
-            time_cost_diffs = [t - avg_time_cost for t in all_aco_time_costs[idx]]
+        # Customize the boxplot appearance
+        boxprops = dict(linestyle='-', linewidth=1.5, color='black', facecolor='cornflowerblue')
+        medianprops = dict(linestyle='-', linewidth=1.5, color='darkblue')
+        flierprops = dict(marker='o', color='black', alpha=0.5)
 
-            # Plot differences
-            ax1.plot([ant_num] * len(exe_time_diffs), exe_time_diffs, 'o-', label=f'Ants {ant_num}')
-            ax2.plot([ant_num] * len(time_cost_diffs), time_cost_diffs, 'o-', label=f'Ants {ant_num}')
-
+        # Boxplot for Execution Time Differences
+        bp1 = ax1.boxplot(all_aco_exe_times, positions=ant_nums, widths=35, boxprops=boxprops,
+                          medianprops=medianprops, flierprops=flierprops, patch_artist=True)
+        ax1.set_xticklabels(ant_nums, rotation=45, ha='right')
         ax1.set_xlabel('Number of Ants', fontsize=16)
         ax1.set_ylabel('Execution Time Difference (seconds)', fontsize=16)
         ax1.set_title('ACO Performance: Execution Time Variability vs. Number of Ants', fontsize=18)
-        ax1.tick_params(axis='both', which='major', labelsize=14)
-        ax1.legend()
-        ax1.grid(True)
+        ax1.grid(True, linestyle='--', which='major', color='grey', alpha=0.7)
 
+        # Boxplot for Time Cost Differences
+        bp2 = ax2.boxplot(all_aco_time_costs, positions=ant_nums, widths=35, boxprops=boxprops,
+                          medianprops=medianprops, flierprops=flierprops, patch_artist=True)
+        ax2.set_xticklabels(ant_nums, rotation=45, ha='right')
         ax2.set_xlabel('Number of Ants', fontsize=16)
         ax2.set_ylabel('Time Cost Difference (seconds)', fontsize=16)
         ax2.set_title('ACO Performance: Time Cost Variability vs. Number of Ants', fontsize=18)
-        ax2.tick_params(axis='both', which='major', labelsize=14)
-        ax2.legend()
-        ax2.grid(True)
+        ax2.grid(True, linestyle='--', which='major', color='grey', alpha=0.7)
 
         plt.subplots_adjust(hspace=0.3)
         plt.tight_layout()
