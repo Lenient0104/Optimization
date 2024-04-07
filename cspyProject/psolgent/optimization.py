@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 
 from tqdm import tqdm
-from pyvis.network import Network
+# from pyvis.network import Network
 from e_car import ECar_EnergyConsumptionModel
 from e_bike import Ebike_PowerConsumptionCalculator
 from e_scooter import Escooter_PowerConsumptionCalculator
@@ -417,61 +417,61 @@ class Optimization:
             self.new_graph[u][v][key]['pheromone_level'] = 0.1
         print("Graph has been reset with updated pheromone levels.")
 
-    def visualize_paths_graph_interactive(self, paths_graph, start_node, end_node):
-        # Initialize the Network object with cdn_resources set to 'remote' for better compatibility
-        nt = Network(notebook=True, height="750px", width="100%", bgcolor="#222222", font_color="white",
-                     cdn_resources='remote')
-
-        # Define colors for different types of edges and nodes
-        station_color = 'lightblue'
-        start_end_color = 'green'
-        walking_edge_color = 'lightgray'
-        other_edge_color = 'blue'
-
-        # Add nodes and edges with attributes
-        for node in paths_graph.nodes:
-            if node.startswith("station_"):
-                # Get station name without the prefix
-                station_name = node.replace("station_", "")
-                nt.add_node(node, title=station_name, color=station_color)
-            elif node == start_node or node == end_node:
-                nt.add_node(node, title=node, color=start_end_color)
-            else:
-                nt.add_node(node, title=node, color=other_edge_color)
-
-        for src, dst, attr in paths_graph.edges(data=True):
-            # Modify edge titles to display mode and total time
-            mode = attr.get('key', 'unknown')
-            total_time = attr.get('weight', 'unknown')
-            title = f"Mode: {mode}, Time: {total_time}"
-            if mode == 'walking':
-                nt.add_edge(src, dst, title=title, color=walking_edge_color, arrows='to')
-            elif mode == 'e_car':
-                nt.add_edge(src, dst, title=title, color='red', arrows='to')
-            elif mode == 'e_scooter_1':
-                nt.add_edge(src, dst, title=title, color='green', arrows='to')
-            else:
-                nt.add_edge(src, dst, title=title, color=other_edge_color, arrows='to')
-
-        # Configure the physics layout of the network
-        nt.set_options(options="""{
-          "physics": {
-            "barnesHut": {
-              "gravitationalConstant": -80000,
-              "centralGravity": 0.3,
-              "springLength": 100,
-              "springConstant": 0.04,
-              "damping": 0.09,
-              "avoidOverlap": 0.1
-            },
-            "minVelocity": 0
-          }
-        }""")
-
-        # Show the interactive plot, specifying the path where the HTML file will be saved
-        output_path = "paths_graph.html"
-        nt.show(output_path)
-        return output_path
+    # def visualize_paths_graph_interactive(self, paths_graph, start_node, end_node):
+    #     # Initialize the Network object with cdn_resources set to 'remote' for better compatibility
+    #     nt = Network(notebook=True, height="750px", width="100%", bgcolor="#222222", font_color="white",
+    #                  cdn_resources='remote')
+    #
+    #     # Define colors for different types of edges and nodes
+    #     station_color = 'lightblue'
+    #     start_end_color = 'green'
+    #     walking_edge_color = 'lightgray'
+    #     other_edge_color = 'blue'
+    #
+    #     # Add nodes and edges with attributes
+    #     for node in paths_graph.nodes:
+    #         if node.startswith("station_"):
+    #             # Get station name without the prefix
+    #             station_name = node.replace("station_", "")
+    #             nt.add_node(node, title=station_name, color=station_color)
+    #         elif node == start_node or node == end_node:
+    #             nt.add_node(node, title=node, color=start_end_color)
+    #         else:
+    #             nt.add_node(node, title=node, color=other_edge_color)
+    #
+    #     for src, dst, attr in paths_graph.edges(data=True):
+    #         # Modify edge titles to display mode and total time
+    #         mode = attr.get('key', 'unknown')
+    #         total_time = attr.get('weight', 'unknown')
+    #         title = f"Mode: {mode}, Time: {total_time}"
+    #         if mode == 'walking':
+    #             nt.add_edge(src, dst, title=title, color=walking_edge_color, arrows='to')
+    #         elif mode == 'e_car':
+    #             nt.add_edge(src, dst, title=title, color='red', arrows='to')
+    #         elif mode == 'e_scooter_1':
+    #             nt.add_edge(src, dst, title=title, color='green', arrows='to')
+    #         else:
+    #             nt.add_edge(src, dst, title=title, color=other_edge_color, arrows='to')
+    #
+    #     # Configure the physics layout of the network
+    #     nt.set_options(options="""{
+    #       "physics": {
+    #         "barnesHut": {
+    #           "gravitationalConstant": -80000,
+    #           "centralGravity": 0.3,
+    #           "springLength": 100,
+    #           "springConstant": 0.04,
+    #           "damping": 0.09,
+    #           "avoidOverlap": 0.1
+    #         },
+    #         "minVelocity": 0
+    #       }
+    #     }""")
+    #
+    #     # Show the interactive plot, specifying the path where the HTML file will be saved
+    #     output_path = "paths_graph.html"
+    #     nt.show(output_path)
+    #     return output_path
 
     def visualize_paths_graph(self, paths_graph):
         plt.figure(figsize=(12, 12))  # Increase figure size

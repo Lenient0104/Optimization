@@ -19,36 +19,6 @@ graph = optimizer_interface.new_graph
 print(graph)
 
 
-# def build_min_time_graph(start_edge, destination_edge):
-#     # First, build the initial paths graph using the existing method
-#     paths_graph = graph
-#
-#     # Create a new DiGraph to store edges with the minimum time
-#     min_time_graph = nx.DiGraph()
-#
-#     # Track the minimum time for each source-destination pair
-#     min_times = {}
-#
-#     for source, target, data in paths_graph.edges(data=True):
-#         edge_time = data['weight']  # Assuming 'weight' is the total time
-#         edge_key = (source, target)
-#
-#         if edge_key not in min_times or edge_time < min_times[edge_key]['weight']:
-#             min_times[edge_key] = data  # Update with the faster path data
-#
-#     # Add nodes and edges with the minimum time to the new graph
-#     for (source, target), data in min_times.items():
-#         min_time_graph.add_node(source)
-#         min_time_graph.add_node(target)
-#         min_time_graph.add_edge(source, target, **data)
-#
-#     # Now min_time_graph contains only the edges with the smallest time between each pair of nodes
-#     print("The graph edges are:", min_time_graph.edges)
-#     # structure of the min_time_graph:
-#     # weight=total_time, key='walking', path=path, pheromone_level=0.1, distance=distance
-#     return min_time_graph
-
-
 def calculate_energy_comsumption(current_mode, distance):
     if current_mode == 'walking':
         return 0
@@ -95,7 +65,7 @@ def build_multimodal_graph(paths_graph, start_edge, destination_edge):
 
 
 def build_energy_cost_graph(multimodal_graph, source_edge, target_edge):
-    G = nx.DiGraph(directed=True, n_res=1)  # For each mode, the electricity is the only constraint currently
+    G = nx.DiGraph(directed=True, n_res=2)  # For each mode, the electricity is the only constraint currently
     print("Building energy cost graph...")
     for source, target, data in multimodal_graph.edges(data=True):
         mode = data.get('mode')
@@ -110,7 +80,7 @@ def build_energy_cost_graph(multimodal_graph, source_edge, target_edge):
         mapped_source = 'Source' if source == source_edge else source
         mapped_target = 'Sink' if target == target_edge else target
 
-        G.add_edge(mapped_source, mapped_target, res_cost=np.array([energy_cost]), weight=time_cost)
+        G.add_edge(mapped_source, mapped_target, res_cost=np.array([energy_cost,0]), weight=time_cost)
     print("end")
     return G
 
@@ -131,7 +101,7 @@ if __name__ == '__main__':
 
 
     n_nodes = len(G.nodes())
-    psolgent = PSOLGENT(G, [100], [0], max_iter=100, swarm_size=50, member_size=n_nodes, neighbourhood_size=50)
+    psolgent = PSOLGENT(G, [100,0], [0,0], max_iter=1000, swarm_size=500, member_size=n_nodes, neighbourhood_size=50)
     psolgent.run()
 
     total_time_cost = 0  # Initialize the total time cost
