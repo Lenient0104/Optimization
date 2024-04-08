@@ -10,7 +10,7 @@ from collections import deque
 from matplotlib import pyplot as plt
 
 from user_info import User
-from optimization import Optimization
+from optimization1 import Optimization
 
 
 class Environment:

@@ -1,10 +1,8 @@
-import statistics
 import unittest
-import time as tm
 from user_info import User
 import matplotlib.pyplot as plt
 from optimization import Optimization
-from Q_learning_agent import MultiModalQLearningAgent
+
 
 
 class Analysis(unittest.TestCase):

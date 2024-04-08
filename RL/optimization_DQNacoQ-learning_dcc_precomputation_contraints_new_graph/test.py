@@ -1,7 +1,7 @@
 import unittest
 from user_info import User
 import matplotlib.pyplot as plt
-from optimization import Optimization
+from optimization1 import Optimization
 
 
 class TestOptimization(unittest.TestCase):
