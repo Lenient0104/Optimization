@@ -140,6 +140,8 @@ class MultiModalQLearningAgent:
         current_state = start
         optimal_path = []
         visited_states = set()
+        total_time = 0
+        find = False
 
         while current_state != destination:
             if current_state in visited_states:
@@ -148,7 +150,6 @@ class MultiModalQLearningAgent:
 
             visited_states.add(current_state)
 
-            # 在当前状态下，选择具有最高 Q 值的动作
             print("current_state", current_state)
             actions = [(action, self.q_table[action]) for action in self.q_table if action[0] == current_state]
             if not actions:
@@ -158,6 +159,9 @@ class MultiModalQLearningAgent:
             best_action = max(actions, key=lambda x: x[1])[0]
             _, next_state, mode = best_action
 
+            time = self.graph[current_state][next_state][mode]['weight']
+            total_time += time
+
             optimal_path.append((current_state, mode, next_state))
             current_state = next_state
 
@@ -165,8 +169,12 @@ class MultiModalQLearningAgent:
             print("Best route:")
             for step in optimal_path:
                 print(f"{step[0]} --[{step[1]}]--> {step[2]}")
-        elif not optimal_path:
+            print(f"total time: {total_time} seconds")
+            find = True
+
+        else:
             print("Failed to start the path; check the starting state and Q-table.")
+        return total_time, find
 
 
 if __name__ == '__main__':
@@ -175,7 +183,7 @@ if __name__ == '__main__':
     target_edge = "-110407380#1"
     db_path = 'test_new.db'
     user = User(60, True, 0, 20)
-    episodes = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500]
+    episodes = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
     test_size = 30
     all_Q_exe_times = []
     all_Q_times = []
@@ -194,15 +202,15 @@ if __name__ == '__main__':
                 start_time = tm.time()
                 agent.learn(source_edge, target_edge, episode)
                 end_time = tm.time()
-                agent.print_optimal_path(source_edge, target_edge)
+                time_cost, find = agent.print_optimal_path(source_edge, target_edge)
+                if not find:
+                    continue
+                execution_time = end_time - start_time
+                episode_exe_times.append(execution_time)
+                episode_times.append(time_cost)
 
-                # execution_time = end_time - start_time
-                # episode_exe_times.append(execution_time)
-                # episode_times.append(time_cost)
-                #
-                # experiment_id = f"{episode}-{i + 1}"
-                # print("time cost: ", time_cost)
-                # writer.writerow([experiment_id, episode, execution_time, time_cost])
+                experiment_id = f"{episode}-{i + 1}"
+                writer.writerow([experiment_id, episode, execution_time, time_cost])
 
             all_Q_exe_times.append(episode_exe_times)
             all_Q_times.append(episode_times)
@@ -230,7 +238,7 @@ if __name__ == '__main__':
                       medianprops=medianprops, flierprops=flierprops, patch_artist=True)
     ax2.set_xticklabels(episodes, rotation=45, ha='right')
     ax2.set_xlabel('Number of Episodes', fontsize=16)
-    ax2.set_ylabel('Time Cost (seconds)', fontsize=16)
+    ax2.set_ylabel('Travel Time Cost (seconds)', fontsize=16)
     ax2.set_title('Q-learning Performance: Time Cost vs. Number of Episodes', fontsize=18)
     ax2.grid(True, linestyle='--', which='major', color='grey', alpha=0.7)
 
