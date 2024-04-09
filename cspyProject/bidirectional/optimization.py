@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 
 from tqdm import tqdm
-from pyvis.network import Network
+# from pyvis.network import Network
 from e_car import ECar_EnergyConsumptionModel
 from e_bike import Ebike_PowerConsumptionCalculator
 from e_scooter import Escooter_PowerConsumptionCalculator
