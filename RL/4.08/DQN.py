@@ -1,4 +1,5 @@
 import time
+import csv
 
 import torch
 import random
@@ -22,9 +23,15 @@ class Environment:
         self.remaining_energy = initial_energy
         self.initial_energy = initial_energy
         self.last_mode = 'walking'
+        self.visited_nodes = set()
         self.reset()
 
+    def get_possible_actions(self, node):
+        return [(neighbor, key, data) for neighbor in self.graph.neighbors(node)
+                for key, data in self.graph[node][neighbor].items()]
+
     def reset(self):
+        self.visited_nodes = {self.current_node}
         self.current_node = self.source
         self.remaining_energy = self.initial_energy  # Reset remaining energy
         self.last_mode = 'walking'  # Reset the last mode used
@@ -40,16 +47,21 @@ class Environment:
         possible_actions = [(neighbor, key, data) for neighbor in self.graph.neighbors(self.current_node)
                             for key, data in self.graph[self.current_node][neighbor].items()]
 
-
-        if not possible_actions or action_index >= len(possible_actions):
-            # Invalid action chosen or no actions available; penalize heavily
-            info = {'current_node': self.current_node, 'mode': self.last_mode, 'action_taken': 'None'}
-            return self._get_state(), -10000, False, info  # Now includes info
-
+        # if action_index >= len(possible_actions):
+        #     # Invalid action chosen or no actions available; penalize heavily
+        #     info = {'current_node': self.current_node, 'mode': self.last_mode, 'action_taken': 'None'}
+        #     return self._get_state(), -10000, False, info  # Now includes info
 
         # Select the action based on the action_index
         selected_action = possible_actions[action_index]
+
         next_node, mode, edge_data = selected_action
+
+        if next_node == self.current_node or next_node in self.visited_nodes:
+            # print('loop')
+            reward = -100000
+            info = {'current_node': self.current_node, 'mode': mode, 'action_taken': 'Loop detected'}
+            return self._get_state(), reward, False, info
 
         # Fetch edge data using the current node, next node, and mode
         edge_data = self.graph[self.current_node][next_node][mode]
@@ -65,45 +77,31 @@ class Environment:
 
         # Check if the action is feasible within the energy constraint
         if self.remaining_energy - energy_consumed < 0:
+            # print("no enough energy")
             # Action not feasible due to energy constraint, so don't change mode
             info = {'current_node': self.current_node, 'mode': self.last_mode, 'action_taken': 'Insufficient energy'}
-            return self._get_state(), -10000, False, info  # Now includes info
-
+            return self._get_state(), -100000, False, info  # Now includes info
 
         self.last_mode = mode  # Update the last mode used
         # Update energy and current node as the action is feasible
         self.remaining_energy -= energy_consumed
         self.current_node = next_node
-
+        self.visited_nodes.add(next_node)
         # The reward is now the negative of the time cost
         reward = -time_cost
+
 
         # Check if the destination has been reached
         done = self.current_node == self.destination
 
 
-
         info = {
-            'current_node': self.current_node,  # Assuming self.current_node tracks the current position
+            'current_node': self.current_node,
             'mode': self.last_mode,
-            'action_taken': action  # Including the action taken can be useful for debugging
-            # Add any other info you might find relevant
+            'action_taken': selected_action  # Assuming `selected_action` is a descriptive action representation
         }
 
         return self._get_state(), reward, done, info
-
-    # def update_state_energy_and_check_done(self, next_node, energy_consumed):
-    #     # Update the environment's current node and remaining energy
-    #     self.current_node = next_node
-    #     self.remaining_energy -= energy_consumed
-    #
-    #     # Check if the destination is reached or energy is depleted
-    #     if next_node == self.destination:
-    #         return 100, True  # Reward for reaching the destination
-    #     elif self.remaining_energy <= 0:
-    #         return -100, True  # Penalty for depleting energy
-    #
-    #     return -1, False  # Standard step penalty to encourage efficiency
 
     def calculate_energy_comsumption(self, current_mode, distance):
         if current_mode == 'walking':
@@ -136,7 +134,7 @@ class DQN(nn.Module):
 
 class DQNAgent:
     def __init__(self, state_dim, action_dim, hidden_dim=128, lr=0.001, gamma=0.95, epsilon=1.0, epsilon_decay=0.995,
-                 min_epsilon=0.01, buffer_size=10000, batch_size=64):
+                 min_epsilon=0.01, buffer_size=100000, batch_size=64):
         self.state_dim = state_dim
         self.action_dim = action_dim
         # Experiences memory
@@ -161,15 +159,24 @@ class DQNAgent:
         # recording
         self.memory.append((state, action, reward, next_state, done))
 
-    def act(self, state):
-        # Explore
-        if np.random.rand() < self.epsilon:
-            return random.randrange(self.action_dim)
-        # Exploit
-        state = torch.FloatTensor(state).unsqueeze(0)  # Convert state to tensor and add batch dimension
-        with torch.no_grad():  # Disable gradient calculation for inference
-            q_values = self.model(state)
-        return np.argmax(q_values.cpu().numpy())  # Choose the action with the highest Q-value
+    def act(self, state, num_actions, test=False):
+        if test:
+            state = torch.FloatTensor(state).unsqueeze(0)
+            with torch.no_grad():
+                q_values = self.model(state)
+            q_values_array = q_values.cpu().numpy()[0][:num_actions]
+            action = np.argmax(q_values_array)
+            return action
+        else:
+            if np.random.rand() < self.epsilon:
+                action = random.randrange(num_actions)
+            else:
+                state = torch.FloatTensor(state).unsqueeze(0)
+                with torch.no_grad():
+                    q_values = self.model(state)
+                q_values_array = q_values.cpu().numpy()[0][:num_actions]
+                action = np.argmax(q_values_array)
+            return action
 
     def replay(self):
         if len(self.memory) < self.batch_size:
@@ -203,6 +210,38 @@ class DQNAgent:
         self.target_model.load_state_dict(self.model.state_dict())
 
 
+# after all the training finished
+def infer_best_route(agent, env, max_steps=1000):
+    state = env.reset()
+    best_route = [env.current_node]
+    best_modes = [env.last_mode]
+    total_time_cost = 0
+    steps = 0
+
+    while steps < max_steps:
+        possible_actions = [(neighbor, key, data) for neighbor in env.graph.neighbors(env.current_node)
+                            for key, data in env.graph[env.current_node][neighbor].items()]
+        num_available_actions = len(possible_actions)
+        if num_available_actions == 0:
+            break
+
+        action = agent.act(state, num_available_actions, test=True)
+
+        next_state, reward, done, info = env.step(action)
+
+        if done:
+            break
+
+        best_route.append(info['action_taken'][0])
+        best_modes.append(info['mode'])
+        total_time_cost -= reward
+
+        state = next_state
+        steps += 1
+    # print('best route: ', best_route)
+    return best_route, best_modes, total_time_cost
+
+
 # Initialize your environment
 net_xml_path = 'DCC.net.xml'
 source_edge = '361450282'
@@ -217,81 +256,99 @@ state_dim = 1  # For example: [current_node_index]
 action_dim = max(
     len(list(graph.out_edges(node))) for node in graph.nodes)  # Max number of possible actions from any node
 
-
 # Define episodes
 episodes = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
 test_size = 30
+done = False
 
-# Lists to store average rewards and execution times
-avg_rewards = []
-avg_exe_times = []
+all_DQN_exe_times = []
+all_DQN_times = []
 
 # Perform experiments
 for episode_count in episodes:
-    agent = DQNAgent(state_dim, action_dim)
-    print(episode_count)
-    total_rewards = []
-    exe_times = []
-    for _ in range(test_size):  # Run 30 times for each episode count
+    episode_exe_times = []
+    episode_times = []
+    print("Episode number: ", episode_count)
+
+    for test_index in range(test_size):  # Run 30 times for each episode count
+        print("test_index", test_index)
+        agent = DQNAgent(state_dim, action_dim)
         start_time = time.time()
-        best_total_reward = float('-inf')
 
         for episode in range(episode_count):
+            route = []
             state = env.reset()
-            total_reward = 0
+            route.append(env.current_node)
             done = False
-            route = [source_edge]  # Initialize an empty route
-            modes_used = ['walking']  # Track modes used for each step in the route
-
             while not done:
-                action = agent.act(state)
+                possible_actions = [(neighbor, key, data) for neighbor in env.graph.neighbors(env.current_node)
+                                    for key, data in env.graph[env.current_node][neighbor].items()]
+                num_available_actions = len(possible_actions)
+                action = agent.act(state, num_available_actions, test=False)
+                # print(env.current_node)
                 next_state, reward, done, info = env.step(action)
-
-                # Append current node and mode to their respective lists
-                route.append(info['current_node'])
-                modes_used.append(info['mode'])
+                route.append(env.current_node)
 
                 agent.remember(state, action, reward, next_state, done)
+                if next_state == state:
+                    break
                 state = next_state
-                total_reward += reward
-
                 if done:
                     agent.update_target_model()
+                    print(route)
 
-            if total_reward > best_total_reward and route[-1] == destination_edge:
-                best_total_reward = total_reward
-
-            if len(agent.memory) > 32:
+            if len(agent.memory) > 64:
                 agent.replay()
+        if done:
+            end_time = time.time()
+            execution_time = end_time - start_time
+            episode_exe_times.append(execution_time)
+            best_route, best_modes, total_time_cost = infer_best_route(agent, env)
+            episode_times.append(total_time_cost)
 
-        total_rewards.append(best_total_reward)
-        exe_times.append(time.time() - start_time)
+    print(f"Best route after training {episode_count} episodes:", best_route)
+    print("Modes used:", best_modes)
+    print("Travel time cost:", total_time_cost)
 
-    avg_rewards.append(-np.mean(total_rewards))  # Taking the negative mean of rewards
-    avg_exe_times.append(np.mean(exe_times))
+    all_DQN_exe_times.append(episode_exe_times)
+    all_DQN_times.append(episode_times)
+
+# Optionally, save the data to a CSV file
+with open('DQN_results.csv', 'w', newline='') as file:
+    writer = csv.writer(file)
+    writer.writerow(['Episode', 'Execution Time (seconds)', 'Time Cost'])
+
+    for i, episode in enumerate(episodes):
+        for j in range(test_size):
+            writer.writerow([episode, all_DQN_exe_times[i][j], all_DQN_times[i][j]])
+
+# Custom boxplot appearance
+boxprops = dict(linestyle='-', linewidth=1.5, color='black', facecolor='cornflowerblue')
+medianprops = dict(linestyle='-', linewidth=1.5, color='darkblue')
+flierprops = dict(marker='o', color='black', alpha=0.5)
 
 # Creating subplots with 2 rows and 1 column
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
 
-# Plotting execution time against number of episodes
-ax1.plot(episodes, avg_exe_times, 'ro-', label='Execution Time')
+# Boxplot for Execution Time
+ax1.boxplot(all_DQN_exe_times, positions=episodes, widths=35, boxprops=boxprops,
+            medianprops=medianprops, flierprops=flierprops, patch_artist=True)
+ax1.set_xticklabels(episodes, rotation=45, ha='right')
 ax1.set_xlabel('Number of Episodes', fontsize=16)
 ax1.set_ylabel('Execution Time (seconds)', fontsize=16)
 ax1.set_title('DQN Performance: Execution Time vs. Number of Episodes', fontsize=18)
-ax1.tick_params(axis='both', which='major', labelsize=14)
-ax1.legend()
-ax1.grid(True)
+ax1.grid(True, linestyle='--', which='major', color='grey', alpha=0.7)
+ax1.legend(['Execution Time'])
 
-# Plotting average rewards against number of episodes
-ax2.plot(episodes, avg_rewards, 'bs-', label='Average Reward')
-ax2.axhline(y=3084.136579657965, color='g', linestyle='--', label='Reference Value')
+# Boxplot for Time Cost
+ax2.boxplot(all_DQN_times, positions=episodes, widths=35, boxprops=boxprops,
+            medianprops=medianprops, flierprops=flierprops, patch_artist=True)
+ax2.set_xticklabels(episodes, rotation=45, ha='right')
 ax2.set_xlabel('Number of Episodes', fontsize=16)
-ax2.set_ylabel('Average time costs (s)', fontsize=16)
-ax2.set_title('DQN Performance: Average Reward vs. Number of Episodes', fontsize=18)
-ax2.tick_params(axis='both', which='major', labelsize=14)
-ax2.legend()
-ax2.grid(True)
+ax2.set_ylabel('Travel Time Cost (seconds)', fontsize=16)
+ax2.set_title('DQN Performance: Travel Time Cost vs. Number of Episodes', fontsize=18)
+ax2.grid(True, linestyle='--', which='major', color='grey', alpha=0.7)
+ax2.legend(['Travel Time Cost'])
 
 plt.tight_layout()
 plt.show()
-
