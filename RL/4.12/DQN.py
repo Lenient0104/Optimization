@@ -31,7 +31,7 @@ class Environment:
                 for key, data in self.graph[node][neighbor].items()]
 
     def reset(self):
-        self.visited_nodes = {self.current_node}
+        self.visited_nodes = set()
         self.current_node = self.source
         self.remaining_energy = self.initial_energy  # Reset remaining energy
         self.last_mode = 'walking'  # Reset the last mode used
@@ -46,11 +46,6 @@ class Environment:
         # Fetch all possible actions from the current node, including their mode as a key for lookup
         possible_actions = [(neighbor, key, data) for neighbor in self.graph.neighbors(self.current_node)
                             for key, data in self.graph[self.current_node][neighbor].items()]
-
-        # if action_index >= len(possible_actions):
-        #     # Invalid action chosen or no actions available; penalize heavily
-        #     info = {'current_node': self.current_node, 'mode': self.last_mode, 'action_taken': 'None'}
-        #     return self._get_state(), -10000, False, info  # Now includes info
 
         # Select the action based on the action_index
         selected_action = possible_actions[action_index]
@@ -111,7 +106,7 @@ class Environment:
         # battery_capacity = {'e_bike_1': 500, 'e_scooter_1': 250, 'e_car': 50000}
         battery_capacity = {'e_bike_1': 500, 'e_scooter_1': 250, 'e_car': 5000}
         energy_consumed = vehicle_efficiency[current_mode] * distance
-        # Calculate the delta SoC (%) for the distance traveled
+        # Calculate the required SoC (%) for the distance traveled
         delta_soc = (energy_consumed / battery_capacity[current_mode]) * 100
 
         return delta_soc
@@ -133,7 +128,7 @@ class DQN(nn.Module):
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, hidden_dim=128, lr=0.001, gamma=0.95, epsilon=1.0, epsilon_decay=0.995,
+    def __init__(self, state_dim, action_dim, hidden_dim=128, lr=0.5, gamma=0.95, epsilon=1.0, epsilon_decay=0.995,
                  min_epsilon=0.01, buffer_size=100000, batch_size=64):
         self.state_dim = state_dim
         self.action_dim = action_dim
