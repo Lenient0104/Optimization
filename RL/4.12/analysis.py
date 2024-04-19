@@ -61,8 +61,8 @@ class Analysis(unittest.TestCase):
                           medianprops=medianprops, flierprops=flierprops, patch_artist=True)
         ax1.set_xticklabels(ant_nums, rotation=45, ha='right')
         ax1.set_xlabel('Number of Ants', fontsize=16)
-        ax1.set_ylabel('Execution Time Difference (seconds)', fontsize=16)
-        ax1.set_title('ACO Performance: Execution Time Variability vs. Number of Ants', fontsize=18)
+        ax1.set_ylabel('Execution Time Cost (seconds)', fontsize=16)
+        ax1.set_title('ACO Performance: Execution Time Cost vs. Number of Ants', fontsize=18)
         ax1.grid(True, linestyle='--', which='major', color='grey', alpha=0.7)
 
         # Boxplot for Time Cost Differences
@@ -70,8 +70,8 @@ class Analysis(unittest.TestCase):
                           medianprops=medianprops, flierprops=flierprops, patch_artist=True)
         ax2.set_xticklabels(ant_nums, rotation=45, ha='right')
         ax2.set_xlabel('Number of Ants', fontsize=16)
-        ax2.set_ylabel('Time Cost Difference (seconds)', fontsize=16)
-        ax2.set_title('ACO Performance: Time Cost Variability vs. Number of Ants', fontsize=18)
+        ax2.set_ylabel('Travel Time Cost (seconds)', fontsize=16)
+        ax2.set_title('ACO Performance: Travel Time Cost vs. Number of Ants', fontsize=18)
         ax2.grid(True, linestyle='--', which='major', color='grey', alpha=0.7)
 
         plt.subplots_adjust(hspace=0.3)

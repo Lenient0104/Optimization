@@ -333,8 +333,8 @@ ax1.boxplot(all_DQN_exe_times, positions=episodes, widths=35, boxprops=boxprops,
             medianprops=medianprops, flierprops=flierprops, patch_artist=True)
 ax1.set_xticklabels(episodes, rotation=45, ha='right')
 ax1.set_xlabel('Number of Episodes', fontsize=16)
-ax1.set_ylabel('Execution Time (seconds)', fontsize=16)
-ax1.set_title('DQN Performance: Execution Time vs. Number of Episodes', fontsize=18)
+ax1.set_ylabel('Execution Time Cost (seconds)', fontsize=16)
+ax1.set_title('DQN Performance: Execution Time Cost vs. Number of Episodes', fontsize=18)
 ax1.grid(True, linestyle='--', which='major', color='grey', alpha=0.7)
 ax1.legend(['Execution Time'])
 

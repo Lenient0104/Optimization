@@ -328,34 +328,47 @@ with open('experiment_results.csv', 'w', newline='') as file:
 
 
 
+# 定义 boxplot 的样式
 boxprops = dict(linestyle='-', linewidth=1.5, color='black', facecolor='cornflowerblue')
 medianprops = dict(linestyle='-', linewidth=1.5, color='darkblue')
 flierprops = dict(marker='o', color='black', alpha=0.5)
 
+# 准备数据，并确保填充后的长度一致
+max_length = max(max(len(times) for times in all_DQN_exe_times if times), max(len(times) for times in all_DQN_times if times))
+filled_exe_times = []
+filled_times = []
+filtered_positions = []
+
+for idx, episode in enumerate(episodes):
+    if all_DQN_exe_times[idx] and all_DQN_times[idx]:  # 只有当数据存在时才处理
+        avg_exe = np.mean(all_DQN_exe_times[idx])
+        avg_time = np.mean(all_DQN_times[idx])
+        filled_exe_times.append(all_DQN_exe_times[idx] + [avg_exe] * (max_length - len(all_DQN_exe_times[idx])))
+        filled_times.append(all_DQN_times[idx] + [avg_time] * (max_length - len(all_DQN_times[idx])))
+        filtered_positions.append(episode)
+
 # 创建画布和子图
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
 
-# 第一个子图：执行时间的箱型图
-ax1.boxplot(all_DQN_exe_times, positions=episodes, widths=10, boxprops=boxprops,
+# 绘制执行时间的箱型图
+ax1.boxplot(filled_exe_times, positions=filtered_positions, widths=10, boxprops=boxprops,
             medianprops=medianprops, flierprops=flierprops, patch_artist=True)
-ax1.set_xticks(episodes)
-ax1.set_xticklabels(episodes, rotation=45)
+ax1.set_xticks(filtered_positions)
+ax1.set_xticklabels(filtered_positions, rotation=45)
 ax1.set_xlabel('Number of Episodes', fontsize=16)
-ax1.set_ylabel('Execution Time (seconds)', fontsize=16)
+ax1.set_ylabel('Execution Time Cost (seconds)', fontsize=16)
 ax1.set_title('DQN Performance: Execution Time vs. Number of Episodes', fontsize=18)
 ax1.grid(True, linestyle='--', which='major', color='grey', alpha=0.7)
 
-# 第二个子图：时间成本的箱型图
-ax2.boxplot(all_DQN_times, positions=episodes, widths=10, boxprops=boxprops,
+# 绘制时间成本的箱型图
+ax2.boxplot(filled_times, positions=filtered_positions, widths=10, boxprops=boxprops,
             medianprops=medianprops, flierprops=flierprops, patch_artist=True)
-ax2.set_xticks(episodes)
-ax2.set_xticklabels(episodes, rotation=45)
+ax2.set_xticks(filtered_positions)
+ax2.set_xticklabels(filtered_positions, rotation=45)
 ax2.set_xlabel('Number of Episodes', fontsize=16)
-ax2.set_ylabel('Time Cost (seconds)', fontsize=16)
-ax2.set_title('DQN Performance: Time Cost vs. Number of Episodes', fontsize=18)
+ax2.set_ylabel('Travel Time Cost (seconds)', fontsize=16)
+ax2.set_title('DQN Performance:Travel Time Cost vs. Number of Episodes', fontsize=18)
 ax2.grid(True, linestyle='--', which='major', color='grey', alpha=0.7)
 
-# 调整子图间距并展示图表
-plt.subplots_adjust(hspace=0.4)
 plt.tight_layout()
 plt.show()
