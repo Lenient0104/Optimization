@@ -278,13 +278,13 @@ with open('experiment_results.csv', 'w', newline='') as file:
     for episode_count in episodes:
         episode_exe_times = []
         episode_times = []
-        successful_tests = 0  # 初始化成功测试计数器
+        successful_tests = 0
         print("Episode number: ", episode_count)
         for test_index in range(test_size):  # Run 30 times for each episode count
             print("test_index", test_index)
             agent = DQNAgent(state_dim, action_dim)
             start_time = time.time()
-            update_frequency = 10  # 例如，每10个情节更新一次
+            update_frequency = 10 
 
             for episode in range(episode_count):
                 state = env.reset()
