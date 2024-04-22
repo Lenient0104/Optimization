@@ -260,7 +260,7 @@ action_dim = max(
     len(list(graph.out_edges(node))) for node in graph.nodes)  # Max number of possible actions from any node
 
 # Define episodes
-episodes = [200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500]
+episodes = [1500]
 test_size = 30
 done = False
 
@@ -285,8 +285,11 @@ with open('DQN_experiment_results.csv', 'w', newline='') as file:
             agent = DQNAgent(state_dim, action_dim)
             start_time = time.time()
             update_frequency = 10
+            rewards = []
 
             for episode in range(episode_count):
+                total_reward = 0  # 初始化该回合的总奖励
+                rewards = []
                 state = env.reset()
                 route = [env.current_node]
                 done = False
@@ -301,14 +304,30 @@ with open('DQN_experiment_results.csv', 'w', newline='') as file:
                     next_state, reward, done, info = env.step(action)
                     route.append(env.current_node)
                     agent.remember(state, action, reward, next_state, done)
+
                     if next_state == state:
                         break  # 防止在相同状态循环
                     state = next_state
+                    print(total_reward)
+                    total_reward += reward  # 更新本回合总奖励
+                    rewards.append(total_reward)  # 记录该回合结束时的总奖励
 
                     if len(agent.memory) > 16:
                         agent.replay()
                 if (episode + 1) % update_frequency == 0:
                     agent.update_target_model()
+
+                if done:
+                    steps = list(range(len(rewards)))  # 创建一个与奖励列表相同长度的回合数列表
+                    # print(rewards)
+                    plt.figure(figsize=(10, 5))
+                    plt.plot(steps, rewards)
+                    plt.xlabel('Move Steps from the Start Edge')  # 横轴标签
+                    plt.ylabel('Total Reward till Current Move Step')  # 纵轴标签
+                    plt.title('DQN: Reward Progression over Move Steps')  # 图表标题
+                    plt.grid(True)  # 显示网格
+                    plt.show()  # 显示图表
+                    print("hehe")
 
             end_time = time.time()
             execution_time = end_time - start_time

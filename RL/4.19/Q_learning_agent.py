@@ -1,7 +1,9 @@
 import csv
 import random
-import statistics
+import seaborn as sns
+import pandas as pd
 import time as tm
+import numpy as np
 
 from matplotlib import pyplot as plt
 
@@ -183,7 +185,7 @@ if __name__ == '__main__':
     target_edge = "-110407380#1"
     db_path = 'test_new.db'
     user = User(60, True, 0, 20)
-    episodes = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
+    episodes = [1000]
     test_size = 30
     all_Q_exe_times = []
     all_Q_times = []
@@ -211,9 +213,48 @@ if __name__ == '__main__':
 
                 experiment_id = f"{episode}-{i + 1}"
                 writer.writerow([experiment_id, episode, execution_time, time_cost])
+                if episode == 1000:
+                    # Assuming agent.q_table is already filled with Q-values from the learning process
+                    # Convert Q-table dictionary into a list of tuples
+                    q_values_list = [(*key, q_value) for key, q_value in agent.q_table.items()]
+
+                    # Create a DataFrame
+                    df_q_values = pd.DataFrame(q_values_list, columns=['Current Edge', 'Next Edge', 'Mode', 'QValue'])
+
+                    # Pivot to create a 2D array where index is 'Current Edge', columns are ('Next Edge', 'Mode'),
+                    # and values are 'QValue'
+                    pivot_df = df_q_values.pivot_table(index='Current Edge',
+                                                       columns=['Next Edge', 'Mode'],
+                                                       values='QValue',
+                                                       aggfunc='first')  # We use 'first' to just take the first
+                    print(pivot_df.isnull().sum().sum())  # Prints the total number of NaN values
+
+                    # Fill NaN values with a default value, for instance, the minimum Q-value or 0.
+                    pivot_df_filled = pivot_df.fillna(pivot_df.min().min())
+                    print(pivot_df_filled)
+                    #
+                    # # Determine the size of the figure
+                    # fig_width = len(pivot_df_filled.columns) / 3  # Adjust the divisor to manage the cell width
+                    # fig_height = len(pivot_df_filled.index) / 3  # Adjust the divisor to manage the cell height
+
+                    # Plotting the heatmap with expanded cell sizes
+                    plt.figure(figsize=(40, 20))
+                    heatmap = sns.heatmap(pivot_df_filled, annot=False, square=True, cmap='viridis')
+
+                    # Annotate only significant Q-values
+                    threshold = 0.5  # set to some value that indicates significance for your case
+                    for x, y in zip(*np.where(np.abs(pivot_df_filled.values) > threshold)):
+                        heatmap.text(y + 0.5, x + 0.5, f'{pivot_df_filled.values[x, y]:.2f}',
+                                     fontdict={'fontsize': 8},
+                                     ha='center', va='center', color='white')
+                    plt.title('Q learning\'s Q values Heatmap', fontsize=50)
+                    plt.xlabel('Next Edge and Mode', fontsize=50)
+                    plt.ylabel('Current Edge', fontsize=50)
+                    plt.show()
 
             all_Q_exe_times.append(episode_exe_times)
             all_Q_times.append(episode_times)
+
 
     plt.rcParams.update({'font.size': 14})
 
