@@ -40,8 +40,6 @@ class MultiModalQLearningAgent:
             for neighbor in self.graph.neighbors(edge):
                 for key, edge_data in self.graph[edge][neighbor].items():
                     self.q_table[(edge, neighbor, key)] = 0  # Initialize Q-values to 0
-        length = len(self.q_table)
-        print("hehe")
 
     def choose_action(self, state, current_energy):
         actions = [action for action in self.q_table if action[0] == state]
@@ -192,7 +190,7 @@ if __name__ == '__main__':
     optimizer = Optimization(net_xml_path, user, db_path, source_edge, target_edge)
     graph = optimizer.new_graph
 
-    with open('results/Q_learning_results_episode400_10stations.csv', 'w', newline='') as file:
+    with open('results/Q_learning_results_episode400_20stations.csv', 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Experiment ID', 'Episode', 'Execution Time (seconds)', 'Time Cost'])
 

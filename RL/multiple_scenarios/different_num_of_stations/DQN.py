@@ -269,7 +269,7 @@ all_DQN_times = []
 all_successful_tests = []  # 新增列表用于存储每个episode的成功测试次数
 
 # Create a new CSV file to store the results
-with open('results/DQN_experiment_results_episode400_15stations.csv', 'w', newline='') as file:
+with open('results/DQN_experiment_results_episode400_20stations.csv', 'w', newline='') as file:
     writer = csv.writer(file)
     # Write the header of the CSV file
     writer.writerow(['Experiment ID', 'Episode', 'Execution Time (seconds)', 'Time Cost', 'Find'])
