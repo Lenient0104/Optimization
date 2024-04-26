@@ -216,30 +216,43 @@ if __name__ == '__main__':
                 if episode == 1000:
                     # Assuming agent.q_table is already filled with Q-values from the learning process
                     # Convert Q-table dictionary into a list of tuples
-                    q_values_list = [(*key, q_value) for key, q_value in agent.q_table.items()]
+                    q_values_list = [(*key, -q_value) for key, q_value in agent.q_table.items()]
+                    contains_none = any(None in item for item in q_values_list)
+                    print("Contains None:", contains_none)
 
                     # Create a DataFrame
                     df_q_values = pd.DataFrame(q_values_list, columns=['Current Edge', 'Next Edge', 'Mode', 'QValue'])
+                    contains_nan = df_q_values.isnull().values.any()
+                    print("DataFrame contains NaN:", contains_nan)
+                    # Assume this dictionary is defined earlier in the code or derived from existing data.
+                    # 收集所有的边缘 ID，并去重
+                    all_edges = list(set(df_q_values['Current Edge'].tolist() + df_q_values['Next Edge'].tolist()))
 
-                    # Pivot to create a 2D array where index is 'Current Edge', columns are ('Next Edge', 'Mode'),
-                    # and values are 'QValue'
+                    # 创建映射，不进行排序，直接赋予新的 ID
+                    edge_id_mapping = {original_id: f"edge_{i + 1}" for i, original_id in enumerate(all_edges)}
+                    print("361450282", edge_id_mapping['361450282'])
+                    print("-110407380#1", edge_id_mapping['-110407380#1'])
+
+                    # Map the edge IDs in the DataFrame
+                    df_q_values['Mapped Current Edge'] = df_q_values['Current Edge'].map(edge_id_mapping)
+                    df_q_values['Mapped Next Edge'] = df_q_values['Next Edge'].map(edge_id_mapping)
+
+                    # Continue with the rest of the process as before
                     pivot_df = df_q_values.pivot_table(index='Current Edge',
                                                        columns=['Next Edge', 'Mode'],
                                                        values='QValue',
-                                                       aggfunc='first')  # We use 'first' to just take the first
-                    print(pivot_df.isnull().sum().sum())  # Prints the total number of NaN values
+                                                       aggfunc='mean')
 
                     # Fill NaN values with a default value, for instance, the minimum Q-value or 0.
-                    pivot_df_filled = pivot_df.fillna(pivot_df.min().min())
-                    print(pivot_df_filled)
-                    #
+                    pivot_df_filled = pivot_df.fillna(0)  # 以0填充NaN值
                     # # Determine the size of the figure
                     # fig_width = len(pivot_df_filled.columns) / 3  # Adjust the divisor to manage the cell width
                     # fig_height = len(pivot_df_filled.index) / 3  # Adjust the divisor to manage the cell height
 
                     # Plotting the heatmap with expanded cell sizes
                     plt.figure(figsize=(40, 20))
-                    heatmap = sns.heatmap(pivot_df_filled, annot=False, square=True, cmap='viridis')
+                    plt.clf()
+                    heatmap = sns.heatmap(pivot_df_filled, annot=False, square=True, cmap='twilight')
 
                     # Annotate only significant Q-values
                     threshold = 0.5  # set to some value that indicates significance for your case
@@ -247,9 +260,9 @@ if __name__ == '__main__':
                         heatmap.text(y + 0.5, x + 0.5, f'{pivot_df_filled.values[x, y]:.2f}',
                                      fontdict={'fontsize': 8},
                                      ha='center', va='center', color='white')
-                    plt.title('Q learning\'s Q values Heatmap', fontsize=50)
-                    plt.xlabel('Next Edge and Mode', fontsize=50)
-                    plt.ylabel('Current Edge', fontsize=50)
+                    plt.title('Q learning\'s Q values Heatmap', fontsize=40)
+                    plt.xlabel('Next Edge and Mode', fontsize=40)
+                    plt.ylabel('Current Edge', fontsize=40)
                     plt.show()
 
             all_Q_exe_times.append(episode_exe_times)

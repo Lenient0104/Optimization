@@ -287,12 +287,15 @@ with open('DQN_experiment_results.csv', 'w', newline='') as file:
             update_frequency = 10
             rewards = []
 
+            # List to hold the total rewards of each episode
+            episode_rewards = []
+
             for episode in range(episode_count):
-                total_reward = 0  # 初始化该回合的总奖励
-                rewards = []
+                total_reward = 0
                 state = env.reset()
                 route = [env.current_node]
                 done = False
+
                 while not done:
                     possible_actions = [
                         (neighbor, key, data)
@@ -306,28 +309,35 @@ with open('DQN_experiment_results.csv', 'w', newline='') as file:
                     agent.remember(state, action, reward, next_state, done)
 
                     if next_state == state:
-                        break  # 防止在相同状态循环
+                        break  # Avoid looping in the same state
                     state = next_state
-                    print(total_reward)
-                    total_reward += reward  # 更新本回合总奖励
-                    rewards.append(total_reward)  # 记录该回合结束时的总奖励
+                    total_reward += reward
 
                     if len(agent.memory) > 16:
                         agent.replay()
+
+                episode_rewards.append(total_reward)  # Store the total reward for the episode
+
                 if (episode + 1) % update_frequency == 0:
                     agent.update_target_model()
 
-                if done:
-                    steps = list(range(len(rewards)))  # 创建一个与奖励列表相同长度的回合数列表
-                    # print(rewards)
-                    plt.figure(figsize=(10, 5))
-                    plt.plot(steps, rewards)
-                    plt.xlabel('Move Steps from the Start Edge')  # 横轴标签
-                    plt.ylabel('Total Reward till Current Move Step')  # 纵轴标签
-                    plt.title('DQN: Reward Progression over Move Steps')  # 图表标题
-                    plt.grid(True)  # 显示网格
-                    plt.show()  # 显示图表
-                    print("hehe")
+            # Compute the average reward per episode
+            average_rewards = [-sum(episode_rewards[:i + 1]) / (i + 1) for i in range(len(episode_rewards))]
+
+
+            # Plotting the results
+            plt.figure(figsize=(10, 5))
+
+            plt.plot(range(1, episode_count + 1), average_rewards)
+            # 明确指定横轴的刻度从1开始
+            plt.xticks(range(1, episode_count + 1))
+
+            plt.xlabel('Episodes')
+            plt.ylabel('Average Total Reward')
+            plt.title('Average Total Rewards per Episode')
+            plt.grid(True)
+            plt.show()
+
 
             end_time = time.time()
             execution_time = end_time - start_time
