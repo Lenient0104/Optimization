@@ -4,6 +4,7 @@ from user_info import User
 import matplotlib.pyplot as plt
 from optimization import Optimization
 
+
 class Analysis(unittest.TestCase):
     def setUp(self):
         self.net_xml_path = 'DCC.net.xml'
@@ -25,25 +26,25 @@ class Analysis(unittest.TestCase):
         all_aco_exe_time_costs = []
         all_aco_time_costs = []
 
-        with open('ACO_results_nocongestion.csv', 'w', newline='') as file:
+        with open('ACO_results_20congestion.csv', 'w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(['Experiment ID', 'Number of Ants', 'Time Cost (seconds)'])
+            writer.writerow(['Experiment ID', 'Number of Ants', 'Travel Time Cost (seconds)', 'Execution Time (seconds)'])
 
             for ant_num in self.ant_num:
                 aco_time_costs = []
                 aco_exe_costs = []
                 for i in range(test_size):
+                    print(i)
                     source_edge, target_edge = od_pairs[i]
                     optimizer_interface = Optimization(self.net_xml_path, self.user, self.db_path, source_edge, target_edge)
                     path, time_cost, exe_time = optimizer_interface.run_aco_algorithm(source_edge, target_edge, ant_num)
-                    if exe_time != 0:
+                    print(time_cost, path)
+                    if exe_time != 0 and time_cost != 'inf':
                         all_aco_time_costs.append(time_cost)
                         all_aco_exe_time_costs.append(exe_time)
                         experiment_id = f"{ant_num}-{i + 1}"
-                        writer.writerow([experiment_id, ant_num, time_cost])
+                        writer.writerow([experiment_id, ant_num, time_cost, exe_time])
 
-                # all_aco_time_costs.append(aco_time_costs)
-                # all_aco_exe_time_costs.append(exe_time)
 
         self.plot_aco_performance_2d(self.ant_num, all_aco_time_costs)
 

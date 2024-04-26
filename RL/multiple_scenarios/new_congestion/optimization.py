@@ -255,22 +255,41 @@ class Optimization:
         # Higher deposit for faster paths
         return 1 / path_cost  # Example function, adjust as needed
 
-    def build_graph(self):
+    def build_graph(self, percentage=20):
         G = nx.DiGraph()
         edges = self.unique_edges
 
+        # Add nodes to the graph
         for edge in edges:
             G.add_node(edge, length=self.edge_map[edge]['length'])
 
+        # Calculate the number of edges to modify
+        num_edges_to_modify = int((percentage / 100) * len(self.unique_edges))
+        # Randomly select edges to modify
+        edges_to_modify = random.sample(self.unique_edges, num_edges_to_modify)
+
         for connection in self.connections:
             length = self.edge_map[connection[0]]['length']
-            G.add_edge(connection[0], connection[1], travel_times={
-                'e_bike_1': length / 9.72,
-                'e_car': length / 22.22,
-                'e_scooter_1': length / 6.25,
-                'walking': length / 1.5
-            }, distance=length)
-        # print(G.number_of_nodes(), G.number_of_edges())
+
+            # Set speed for modified edges to 0.1 and calculate travel time
+            if (connection[0] in edges_to_modify) or (connection[1] in edges_to_modify):
+                travel_times = {
+                    'e_bike_1': length / 1,
+                    'e_car': length / 1,
+                    'e_scooter_1': length / 1,
+                    'walking': length / 0.5
+                }
+            else:
+                travel_times = {
+                    'e_bike_1': length / 9.72,
+                    'e_car': length / 22.22,
+                    'e_scooter_1': length / 6.25,
+                    'walking': length / 1.5
+                }
+
+            # Add edges to the graph with either modified or normal travel times
+            G.add_edge(connection[0], connection[1], travel_times=travel_times, distance=length)
+
         return G
 
     def shortest_path_for_mode(self, source, target, mode):
