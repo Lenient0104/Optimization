@@ -6,7 +6,7 @@ import time as tm
 from matplotlib import pyplot as plt
 
 from user_info import User
-from optimization import Optimization
+from optimization_new import Optimization
 
 
 class MultiModalQLearningAgent:
@@ -179,38 +179,48 @@ class MultiModalQLearningAgent:
 
 if __name__ == '__main__':
     net_xml_path = 'DCC.net.xml'
-    source_edge = '361450282'
-    target_edge = "-110407380#1"
+    # source_edge = '361450282'
+    # target_edge = "-110407380#1"
     db_path = 'test_new.db'
     user = User(60, True, 0, 20)
     episodes = [400]
-    test_size = 1
     all_Q_exe_times = []
     all_Q_times = []
-    optimizer = Optimization(net_xml_path, user, db_path, source_edge, target_edge)
-    graph = optimizer.new_graph
 
-    with open('Q_learning_results_80congestion.csv', 'w', newline='') as file:
+
+    with open('od_pairs_500.csv', 'r') as file:
+        reader = csv.reader(file)
+        od_pairs = [tuple(row) for row in reader]
+    test_size = len(od_pairs)
+
+    with open('Q_learning_results_80speed.csv', 'w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['Experiment ID', 'Episode', 'Execution Time (seconds)', 'Travel Time Cost (seconds)'])
+        writer.writerow(['Experiment ID', 'Execution Time (seconds)', 'Travel Time Cost (seconds)', 'Find'])
 
         for episode in episodes:
             episode_exe_times = []
             episode_times = []
             for i in range(test_size):
+                print(i)
+                source_edge, target_edge = od_pairs[i]
+                optimizer = Optimization(net_xml_path, user, db_path, source_edge, target_edge)
+                graph = optimizer.new_graph
+                if graph is None:
+                    writer.writerow([i + 1, 0, 0, False])
+                    continue
                 agent = MultiModalQLearningAgent(graph)
                 start_time = tm.time()
                 agent.learn(source_edge, target_edge, episode)
                 end_time = tm.time()
                 time_cost, find = agent.print_optimal_path(source_edge, target_edge)
-                if not find:
-                    continue
+                # if not find:
+                #     continue
                 execution_time = end_time - start_time
                 episode_exe_times.append(execution_time)
                 episode_times.append(time_cost)
 
-                experiment_id = f"{episode}-{i + 1}"
-                writer.writerow([experiment_id, episode, execution_time, time_cost])
+                experiment_id = f"{i + 1}"
+                writer.writerow([experiment_id, execution_time, time_cost, find])
 
             all_Q_exe_times.append(episode_exe_times)
             all_Q_times.append(episode_times)
