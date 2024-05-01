@@ -16,17 +16,15 @@ class Analysis(unittest.TestCase):
         self.user = User(60, True, 0, 20)
 
     def test_run_optimizer(self):
-        # 从文件中读取OD对
         with open('od_pairs_500.csv', 'r') as file:
             reader = csv.reader(file)
             od_pairs = [tuple(row) for row in reader]
 
-        test_size = len(od_pairs)  # 控制最大测试数量
-
+        test_size = len(od_pairs)  
         all_aco_exe_time_costs = []
         all_aco_time_costs = []
 
-        with open('ACO_results_40speednew.csv', 'w', newline='') as file:
+        with open('results/ACO_results_40speednew.csv', 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['Experiment ID', 'Number of Ants', 'Travel Time Cost (seconds)', 'Execution Time (seconds)'])
 

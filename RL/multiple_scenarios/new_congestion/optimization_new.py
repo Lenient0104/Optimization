@@ -160,7 +160,7 @@ class Optimization:
         # Higher deposit for faster paths
         return 1 / path_cost  # Example function, adjust as needed
 
-    def build_graph(self, percentage=0.4):
+    def build_graph(self, percentage=0.8):
         G = nx.DiGraph()
         edges = self.unique_edges
 
@@ -214,6 +214,7 @@ class Optimization:
         return mode_stations
 
     def calculate_all_modes_shortest_paths(self):
+        flag = True
         G = self.build_graph()  # Ensure this graph includes travel times correctly set up for each edge
 
         all_modes_shortest_paths = {}
@@ -240,12 +241,14 @@ class Optimization:
                             shortest_paths[(source, target)] = (path, total_time, total_distance)
                         except nx.NetworkXNoPath:
                             print(f"No path found from {source} to {target} for mode {mode}.")
+                            flag = False
 
             all_modes_shortest_paths[mode] = shortest_paths
 
-        return all_modes_shortest_paths
+        return all_modes_shortest_paths, flag
 
     def calculate_walking_paths_from_start(self, source, destination_edge):
+        flag = True
         G = self.G
 
         def walking_time(u, v, d):
@@ -265,12 +268,15 @@ class Optimization:
                     walking_paths[target] = (path, total_time, total_distance)
                 except nx.NodeNotFound:
                     print(f"Node not found from {source} to {target}")
+                    flag = False
                 except nx.NetworkXNoPath:
                     print(f"No walking path found from {source} to {target}.")
+                    flag = False
 
-        return walking_paths
+        return walking_paths, flag
 
     def calculate_walking_paths_to_destination(self, start_edge, destination_edge):
+        flag = True
         G = self.G  # Ensure this graph includes walking times as weights
 
         # Extract the walking time for an edge
@@ -293,10 +299,11 @@ class Optimization:
                     paths_to_destination[source] = (path, total_time, total_distance)
                 except nx.NodeNotFound:
                     print(f"Node not found from {source} to {destination_edge}.")
+                    flag = False
                 except nx.NetworkXNoPath:
                     print(f"No walking path found from {source} to {destination_edge}.")
-        print("paths_to_destination", paths_to_destination)
-        return paths_to_destination
+                    flag = False
+        return paths_to_destination, flag
 
     def build_new_graph(self, start_edge, destination_edge):
         paths_graph = nx.MultiDiGraph()
@@ -307,7 +314,9 @@ class Optimization:
         for node in all_station_edges:
             paths_graph.add_node(node)
 
-        all_modes_shortest_paths = self.calculate_all_modes_shortest_paths()
+        all_modes_shortest_paths, flag = self.calculate_all_modes_shortest_paths()
+        if flag is False:
+            return None
         for mode, mode_shortest_paths in all_modes_shortest_paths.items():
             for (source, target), (path, total_time, distance) in mode_shortest_paths.items():
                 if {source, target}.issubset(all_station_edges):
@@ -315,8 +324,12 @@ class Optimization:
                     paths_graph.add_edge(source, target, weight=total_time, path=path, pheromone_level=0.1,
                                          distance=distance, key=mode)
 
-        walking_paths_from_start = self.calculate_walking_paths_from_start(start_edge, destination_edge)
-        walking_paths_to_destination = self.calculate_walking_paths_to_destination(start_edge, destination_edge)
+        walking_paths_from_start, flag = self.calculate_walking_paths_from_start(start_edge, destination_edge)
+        if flag is False:
+            return None
+        walking_paths_to_destination, flag = self.calculate_walking_paths_to_destination(start_edge, destination_edge)
+        if flag is False:
+            return None
         for target, (path, total_time, distance) in walking_paths_from_start.items():
             if target in all_station_edges:
                 paths_graph.add_edge(start_edge, target, weight=total_time, key='walking', path=path,

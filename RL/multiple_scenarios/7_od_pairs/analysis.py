@@ -26,7 +26,7 @@ class Analysis(unittest.TestCase):
         all_aco_exe_times = []
         all_aco_time_costs = []
 
-        with open('results/ACO_results_antnum350_1.csv', 'w', newline='') as file:
+        with open('results/test.csv', 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['Experiment ID', 'Number of Ants', 'Execution Time (seconds)', 'Time Cost (seconds)'])
 
