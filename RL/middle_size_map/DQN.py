@@ -268,7 +268,7 @@ done = False
 
 all_DQN_exe_times = []
 all_DQN_times = []
-all_successful_tests = []  # 新增列表用于存储每个episode的成功测试次数
+all_successful_tests = []
 
 
 
@@ -336,23 +336,6 @@ with open('results/DQN_experiment_results_mid_map.csv', 'w', newline='') as file
 
                 if (episode + 1) % update_frequency == 0:
                     agent.update_target_model()
-
-            # # Compute the average reward per episode
-            # average_rewards = [-sum(episode_rewards[:i + 1]) / (i + 1) for i in range(len(episode_rewards))]
-            #
-            #
-            # # Plotting the results
-            # plt.figure(figsize=(10, 5))
-            #
-            # plt.plot(range(1, episode_count + 1), average_rewards)
-            # # 明确指定横轴的刻度从1开始
-            # plt.xticks(range(1, episode_count + 1))
-            #
-            # plt.xlabel('Episodes')
-            # plt.ylabel('Average Total Reward')
-            # plt.title('Average Total Rewards per Episode')
-            # plt.grid(True)
-            # plt.show()
 
 
             end_time = time.time()
