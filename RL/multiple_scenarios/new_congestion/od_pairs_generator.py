@@ -1,7 +1,5 @@
 import csv
-import unittest
 from user_info import User
-import matplotlib.pyplot as plt
 from optimization import Optimization
 
 
@@ -19,7 +17,7 @@ def generate_od_pairs():
     optimization = Optimization(net_xml_path, user, db_path, source_edge,target_edge)  # 初始化Optimization类
     od_pairs = optimization.choose_od_pairs()  # 获取OD对
 
-    with open('od_pairs.csv', 'w', newline='') as file:
+    with open('od_pairs_500.csv', 'w', newline='') as file:
         writer = csv.writer(file)
         for pair in od_pairs:
             writer.writerow(pair)  # 将每个OD对写入CSV文件

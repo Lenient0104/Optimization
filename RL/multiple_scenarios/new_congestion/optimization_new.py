@@ -1,4 +1,3 @@
-import heapq
 import re
 import sqlite3
 import time
@@ -14,9 +13,6 @@ from e_bike import Ebike_PowerConsumptionCalculator
 from e_scooter import Escooter_PowerConsumptionCalculator
 
 
-# matplotlib.use('TkAgg')  # Use Tkinter backend
-
-
 class Optimization:
     def __init__(self, net_xml_path, user, db_path, start_edge, destination_edge):
         self.mode_stations = None
@@ -28,11 +24,10 @@ class Optimization:
         self.db_connection = sqlite3.connect(db_path)
 
         # Parse the XML file to get road and lane information
-        self.edges, self.edge_map = self.parse_net_xml(net_xml_path)
+        self.edge_map = self.parse_net_xml(net_xml_path)
         # Map time to lanes using the provided CSV file
         self.edges_station = self.get_stations(self.user)
-        self.map_speed()
-        self.mode_time_cal()
+
         # Insert energy model
         self.ecar_energymodel = ECar_EnergyConsumptionModel(4)
         self.ebike_energymodel = Ebike_PowerConsumptionCalculator()
@@ -40,13 +35,13 @@ class Optimization:
         # self.map_energy_to_lanes(60, 1)
         # self.map_station_availability()
 
-        self.initialize_pheromone_levels()
+
         self.G = self.build_graph()
         self.new_graph = self.build_new_graph(start_edge, destination_edge)
 
     def choose_od_pairs(self):
-        random.seed(66)  # 设置随机种子，确保每次运行结果一致
-        selected_pairs = random.sample(self.unique_edges, k=500 * 2)  # 选出500对，所以需要乘以2
+        random.seed(88)
+        selected_pairs = random.sample(self.unique_edges, k=500 * 2)
         od_pairs = [(selected_pairs[i], selected_pairs[i + 1]) for i in range(0, len(selected_pairs), 2)]
         return od_pairs
 
@@ -54,10 +49,9 @@ class Optimization:
         pattern = r"^[A-Za-z]+"
         tree = ET.parse(filepath)
         root = tree.getroot()
-        edges = {}
         # Creating a map for edge details from <edge> tags
         edge_detail_map = {}
-        start_time = time.time()
+
         for edge in tqdm(root.findall('edge'), desc="Processing edges"):
             for lane in edge.findall('lane'):
                 edge_id = edge.attrib['id']
@@ -66,10 +60,7 @@ class Optimization:
                     'speed_limit': float(lane.attrib['speed']),
                     'shape': lane.attrib['shape'],
                 }
-        end_time = time.time()  # End timing
-        print(f"Finished information extraction from edges in {end_time - start_time:.2f} seconds.")
 
-        start_time = time.time()
         # Constructing edges from <connection> tags
         for conn in tqdm(root.findall('connection'), desc="Processing connections", mininterval=1.0):
             pairs = []
@@ -87,78 +78,7 @@ class Optimization:
             pairs.append(to_edge)
             self.connections.append(pairs)
 
-            # Using details from <edge> if available, else setting defaults
-            details_from = edge_detail_map.get(from_edge, {'length': 0, 'speed_limit': 0})
-            details_to = edge_detail_map.get(to_edge, {'length': 0, 'speed_limit': 0})
-
-            # edges data structure
-            edges[connection_id] = {
-                'from_edge': from_edge,
-                'to_edge': to_edge,
-                'from_length': details_from['length'],
-                'to_length': details_to['length'],
-                'length': details_from['length'] + details_to['length'],
-                'speed_limit': 13.9,
-                'mode_time': {
-                    'e_bike_1': {'from_time': 0, 'to_time': 0},
-                    'e_car': {'from_time': 0, 'to_time': 0},
-                    'e_scooter_1': {'from_time': 0, 'to_time': 0},
-                    'walking': {'from_time': 0, 'to_time': 0}
-                },
-                'speed': {
-                    'e_bike_1': {'from_speed': 0.0, 'to_speed': 0.0},
-                    'e_car': {'from_speed': 0.0, 'to_speed': 0.0},
-                    'e_scooter_1': {'from_speed': 0.0, 'to_speed': 0.0},
-                    'walking': {'speed': 1.4}
-                },
-                'from_average_speed': 0,
-                'to_average_speed': 0,
-                'energy_consumption': {
-                    'e_bike_1': {'from_energy': 0, 'to_energy': 0},
-                    'e_car': {'from_energy': 0, 'to_energy': 0},
-                    'e_scooter_1': {'from_energy': 0, 'to_energy': 0}
-                },
-                'pheromone_levels': {
-                    'e_bike_1': {'from': 0.1, 'to': 0.1},
-                    'e_car': {'from': 0.1, 'to': 0.1},
-                    'e_scooter_1': {'from': 0.1, 'to': 0.1},
-                    'walking': {'from': 0.1, 'to': 0.1}
-                }
-            }
-
-        end_time = time.time()  # End timing for the connections
-        print(f"Finished constructing connections in {end_time - start_time:.2f} seconds.")
-        return edges, edge_detail_map
-
-    def map_speed(self):
-        for _, edge_data in tqdm(self.edges.items(), desc="Setting Speed Data"):
-            edge_data['speed']['e_bike_1']['from_speed'] = 5.6
-            edge_data['speed']['e_bike_1']['to_speed'] = 5.6
-            edge_data['speed']['e_scooter_1']['from_speed'] = 5.6
-            edge_data['speed']['e_scooter_1']['to_speed'] = 5.6
-            edge_data['speed']['e_car']['from_speed'] = 33.3
-            edge_data['speed']['e_car']['to_speed'] = 33.3
-
-    def mode_time_cal(self):
-        for _, edge_data in tqdm(self.edges.items(), desc="Setting Time Data"):
-            edge_data['mode_time']['e_bike_1']['from_time'] = edge_data['from_length'] / edge_data['speed']['e_bike_1'][
-                'from_speed']
-            edge_data['mode_time']['e_bike_1']['to_time'] = edge_data['to_length'] / edge_data['speed']['e_bike_1'][
-                'to_speed']
-            edge_data['mode_time']['e_scooter_1']['from_time'] = edge_data['from_length'] / \
-                                                                 edge_data['speed']['e_scooter_1'][
-                                                                     'from_speed']
-            edge_data['mode_time']['e_scooter_1']['to_time'] = edge_data['to_length'] / \
-                                                               edge_data['speed']['e_scooter_1'][
-                                                                   'to_speed']
-            edge_data['mode_time']['e_car']['from_time'] = edge_data['from_length'] / edge_data['speed']['e_car'][
-                'from_speed']
-            edge_data['mode_time']['e_car']['to_time'] = edge_data['to_length'] / edge_data['speed']['e_car'][
-                'to_speed']
-            edge_data['mode_time']['walking']['from_time'] = edge_data['from_length'] / edge_data['speed']['walking'][
-                'speed']
-            edge_data['mode_time']['walking']['to_time'] = edge_data['to_length'] / edge_data['speed']['walking'][
-                'speed']
+        return edge_detail_map
 
     def get_stations(self, user):
         # Ensure all edges initially have just a 'walking' station
@@ -173,19 +93,6 @@ class Optimization:
         for edge_id in edge_to_assign:
             edge_stations[edge_id] = ['walking'] + e_mobility_stations
         return edge_stations
-
-    # need changing
-    def initialize_pheromone_levels(self):
-        for connection_id in self.edges:
-            # Initialize pheromone levels for each transportation mode
-            pheromone_init_value = 0.1
-            self.edges[connection_id]['pheromone_levels'] = {
-                'e_bike_1': {'from': pheromone_init_value, 'to': pheromone_init_value},
-                'e_car': {'from': pheromone_init_value, 'to': pheromone_init_value},
-                'e_scooter_1': {'from': pheromone_init_value, 'to': pheromone_init_value},
-                'walking': {'from': pheromone_init_value, 'to': pheromone_init_value}
-            }
-        # print(self.convert(self.edges)['-1'])
 
     def check_edge_existence(self, edge):
         if edge in self.unique_edges:
@@ -253,7 +160,7 @@ class Optimization:
         # Higher deposit for faster paths
         return 1 / path_cost  # Example function, adjust as needed
 
-    def build_graph(self, percentage=0):
+    def build_graph(self, percentage=0.4):
         G = nx.DiGraph()
         edges = self.unique_edges
 
@@ -261,29 +168,16 @@ class Optimization:
         for edge in edges:
             G.add_node(edge, length=self.edge_map[edge]['length'])
 
-        # Calculate the number of edges to modify
-        num_edges_to_modify = int((percentage / 100) * len(self.unique_edges))
-        # Randomly select edges to modify
-        edges_to_modify = random.sample(self.unique_edges, num_edges_to_modify)
-
         for connection in self.connections:
             length = self.edge_map[connection[0]]['length']
+            max_speed = self.edge_map[connection[0]]['speed_limit']
 
-            # Set speed for modified edges to 0.1 and calculate travel time
-            if (connection[0] in edges_to_modify) or (connection[1] in edges_to_modify):
-                travel_times = {
-                    'e_bike_1': length / 1,
-                    'e_car': length / 1,
-                    'e_scooter_1': length / 1,
-                    'walking': length / 0.5
-                }
-            else:
-                travel_times = {
-                    'e_bike_1': length / 9.72,
-                    'e_car': length / 22.22,
-                    'e_scooter_1': length / 6.25,
-                    'walking': length / 1.5
-                }
+            travel_times = {
+                'e_bike_1': length / (min(8.3, max_speed) * percentage),
+                'e_car': length / (min(33.3, max_speed) * percentage),
+                'e_scooter_1': length / (min(6.94, max_speed) * percentage),
+                'walking': length / (min(1.5, max_speed) * percentage)
+            }
 
             # Add edges to the graph with either modified or normal travel times
             G.add_edge(connection[0], connection[1], travel_times=travel_times, distance=length)
@@ -538,7 +432,7 @@ class Optimization:
 
         # print(self.edges_station)
         for ant_num in range(number_of_ants):
-            ant = Ant(start_edge, destination_edge, self.db_connection, self.edges, self.mode_stations, ant_index,
+            ant = Ant(start_edge, destination_edge, self.db_connection, self.mode_stations, ant_index,
                       self.new_graph, mode)
             print("ant", ant_index)
             move_count = 0
@@ -584,7 +478,7 @@ class Optimization:
         current_best_ant = self.find_best_path(ants, destination_edge, total_pheromones)  # based on pheromone level
         if current_best_ant is not None:
             best_path = current_best_ant.path
-            best_time_cost = current_best_ant.total_time_cost
+            best_time_cost = current_best_ant.total_time_cost + self.edge_map[destination_edge]['length'] / 1.5
         # best_distance_cost = current_best_ant.path_length
 
         # if (iteration + 1) % log_interval == 0 or iteration == number_of_iterations - 1: print( f"Iteration {
