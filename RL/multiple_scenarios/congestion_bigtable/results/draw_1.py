@@ -56,5 +56,5 @@ simulation_times = best_algo_count.index.get_level_values('Simulation Time').uni
 plt.xticks(ticks=range(len(simulation_times)), labels=simulation_times)
 
 
-plt.xticks(rotation=0)
+plt.xticks(rotation=45)
 plt.show()
