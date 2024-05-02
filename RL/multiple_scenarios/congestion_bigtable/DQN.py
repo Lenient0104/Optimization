@@ -11,7 +11,7 @@ from collections import deque
 from matplotlib import pyplot as plt
 
 from user_info import User
-from optimization import Optimization
+from optimization_new import Optimization
 
 
 class Environment:
@@ -288,7 +288,7 @@ with open('results/DQN_experiment_results_simulation', 'w', newline='') as file:
         for test_index in range(test_size):
             print("test_index", test_index)
             source_edge, target_edge = od_pairs[test_index]
-            optimizer = Optimization(net_xml_path, user, db_path, source_edge, target_edge)
+            optimizer = Optimization(net_xml_path, user, db_path, simulation, source_edge, target_edge)
             graph = optimizer.new_graph
             if graph is None:
                 writer.writerow([test_size + 1, episodes[0], simulation, 0, 0, False])

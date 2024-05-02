@@ -4,13 +4,17 @@ from user_info import User
 import matplotlib.pyplot as plt
 from optimization_new import Optimization
 
+# Download the Bigtable library: pip install google-cloud-bigtable
+# Download the service account, JSON file from the simulation github (AdminBT.json)
+# Set environment variable, GOOGLE_APPLICATION_CREDENTIALS:
+# GOOGLE_APPLICATION_CREDENTIALS="/path to/AdminBT.json"
 
 class Analysis(unittest.TestCase):
     def setUp(self):
         self.net_xml_path = 'DCC.net.xml'
         self.start_mode = 'walking'
         self.ant_num = [350]
-        self.simulation_time = [0, 10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000]
+        self.simulation_time = [40000, 50000, 60000, 70000, 80000]
         self.episodes = [500, 1000, 1500, 2000]
         self.iteration = 1
         self.db_path = 'test_new.db'
@@ -25,7 +29,7 @@ class Analysis(unittest.TestCase):
         all_aco_exe_time_costs = []
         all_aco_time_costs = []
 
-        with open('results/ACO-results-simulation_time_0.csv', 'w', newline='') as file:
+        with open('results/ACO-results-simulation_time_0_new.csv', 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['Experiment ID', 'Number of Ants', 'Simulation Time', 'Travel Time Cost (seconds)', 'Execution Time (seconds)', 'Find'])
 

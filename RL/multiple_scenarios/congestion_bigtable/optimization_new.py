@@ -164,7 +164,7 @@ class Optimization:
         return 1 / path_cost  # Example function, adjust as needed
 
     def get_simulation_data(self):
-        queryTest.query_speed_at_time(self.simulation)
+        # queryTest.query_speed_at_time(self.simulation)
         filename = "query_results-" + str(self.simulation) + ".json"
         with open(filename, 'r') as f:
             data = json.load(f)

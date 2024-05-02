@@ -5,7 +5,7 @@ import time as tm
 from matplotlib import pyplot as plt
 
 from user_info import User
-from optimization import Optimization
+from optimization_new import Optimization
 
 
 class MultiModalQLearningAgent:
@@ -202,7 +202,7 @@ if __name__ == '__main__':
             for i in range(test_size):
                 print(i)
                 source_edge, target_edge = od_pairs[i]
-                optimizer = Optimization(net_xml_path, user, db_path, source_edge, target_edge)
+                optimizer = Optimization(net_xml_path, user, db_path, simulation, source_edge, target_edge)
                 graph = optimizer.new_graph
                 if graph is None:
                     writer.writerow([i + 1, episodes[0], simulation, 0, 0, False])
@@ -225,33 +225,3 @@ if __name__ == '__main__':
             all_Q_exe_times.append(episode_exe_times)
             all_Q_times.append(episode_times)
 
-    plt.rcParams.update({'font.size': 14})
-
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
-
-    # Customize the boxplot appearance
-    boxprops = dict(linestyle='-', linewidth=1.5, color='black', facecolor='cornflowerblue')
-    medianprops = dict(linestyle='-', linewidth=1.5, color='darkblue')
-    flierprops = dict(marker='o', color='black', alpha=0.5)
-
-    # Boxplot for Execution Time
-    bp1 = ax1.boxplot(all_Q_exe_times, positions=episodes, widths=45, boxprops=boxprops,
-                      medianprops=medianprops, flierprops=flierprops, patch_artist=True)
-    ax1.set_xticklabels(episodes, rotation=45, ha='right')
-    ax1.set_xlabel('Number of Episodes', fontsize=16)
-    ax1.set_ylabel('Execution Time (seconds)', fontsize=16)
-    ax1.set_title('Q-learning Performance: Execution Time vs. Number of Episodes', fontsize=18)
-    ax1.grid(True, linestyle='--', which='major', color='grey', alpha=0.7)
-
-    # Boxplot for Time Cost
-    bp2 = ax2.boxplot(all_Q_times, positions=episodes, widths=45, boxprops=boxprops,
-                      medianprops=medianprops, flierprops=flierprops, patch_artist=True)
-    ax2.set_xticklabels(episodes, rotation=45, ha='right')
-    ax2.set_xlabel('Number of Episodes', fontsize=16)
-    ax2.set_ylabel('Travel Time Cost (seconds)', fontsize=16)
-    ax2.set_title('Q-learning Performance: Time Cost vs. Number of Episodes', fontsize=18)
-    ax2.grid(True, linestyle='--', which='major', color='grey', alpha=0.7)
-
-    plt.subplots_adjust(hspace=0.3)
-    plt.tight_layout()
-    plt.show()
