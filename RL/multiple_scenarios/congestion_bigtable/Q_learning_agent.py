@@ -192,7 +192,7 @@ if __name__ == '__main__':
         od_pairs = [tuple(row) for row in reader]
     test_size = len(od_pairs)
 
-    with open('results/Q_learning_results_simulation', 'w', newline='') as file:
+    with open('results/Q_learning_results_simulation_new.csv', 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Experiment ID', 'Episode', 'Simulation Time', 'Execution Time (seconds)', 'Travel Time Cost (seconds)', 'Find'])
 

@@ -1,6 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-
+import seaborn as sns
 
 
 def filter_data(csv_file):
@@ -18,6 +18,11 @@ def filter_data(csv_file):
 
     # Filter out rows where Travel Time Cost is not False
     filtered_data = data[data['Find'] != False]
+
+    data['Find'] = data['Find'].replace({'TRUE': True, 'FALSE': False})
+
+    # 保存修改后的表格
+    data.to_csv(csv_file, index=False)
 
     print(filtered_data)
 
@@ -46,8 +51,8 @@ def plot_box_plot_travel_time(filtered_data):
     plt.boxplot(all_data, labels=unique_ants)
     plt.xlabel('Simulation Time')
     plt.ylabel('Travel Time Cost (seconds)')
-    plt.title('DQN: Box Plot of Travel Time Cost for Different Simulation Times')
-    plt.savefig('DQN: Box Plot of Travel Time Cost')
+    plt.title('ACO: Box Plot of Travel Time Cost for Different Simulation Times')
+    plt.savefig('ACO: Box Plot of Travel Time Cost')
     plt.show()
 
 
@@ -79,6 +84,6 @@ def plot_box_plot_execution_time(filtered_data):
 
 
 # Call the functions
-filtered_data = filter_data("DQN_experiment_results_simulation")
+filtered_data = filter_data("Q_learning_results_simulation.csv")
 plot_box_plot_travel_time(filtered_data)
 # plot_box_plot_execution_time(filtered_data)
