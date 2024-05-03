@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "forward-venture-415212",
+  "private_key_id": "a58feeeafe97b69c6c7fccc446b786cdab490797",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEuwIBADANBgkqhkiG9w0BAQEFAASCBKUwggShAgEAAoIBAQCtZ30Eo/XZFXzB\nqo8o8MQ1YoXfNssLD5QjPjwkIC80v9T2DjWFhNSe8XM0Uiv9r8Jn0rQQv4MA/PI4\nG5ls0rYuuCmo96+djIRvrIAluhc+keAlgRpRvDiAvUFbIFZDRqYAyC3fS9P+vT05\nayAVKFEUlJf/ULWOkl2WZE/bgcbwzoqypaKDVGtz9GZer56xZ1LWmkJuvPkO7lG2\n5uoa0R96BIzv1ExVmAJJa+uR74OBjBoFCM8eKOrQ5grxUlbcEx7mVF/lBfUUwOux\nnudIunAML9ylpwMJyUcm3HhaIVx2Vo6wv9OLq5IFDrq3LtIbttYn+Mvv8yaoVyKk\nhJo/1Ba1AgMBAAECgf9kkjKNPnPeNCmhhn8Bf7oePFHRWMHTRY0UEkRmmCzI2dbq\nDUgJFwcLy0+AGm5dlztpkzmiN0Jg7WsaQoqFO/Z5okq10je9C5nbcPycKsxE1TN3\nGLVfeEU12gKfUb8TaMkwWXVYzRB+qKvISkfuWpDakzzyAEwG9hcunMU/4dC0tcKn\nFuD9egRAK2VshZYoy3gB3W1swb69Nm3zBIdZNVWp34bfYDTM7O0/zPZ0Ijy622y1\ngyiZgkuSKmnrlPkDVwJamGhvUrUV5iRQGnHRJzz5jf4dEfLBcTa3w6REkxgWq2ZV\nOYHCaFJtlpWwBsgyPG95TnGrsBd3hy14KMTwVikCgYEA7riN2WufmW1RZqBipOja\nYHtw5fQ7kyRsDM2dOA4ZTyTA4v86GRnMzJn+3ogI/h8SFZTDpcDrK3ScoIBFdHed\nG+m/lDk3cdoUzM2hQrZvZ7I3KYxTEeRNvLztwwDl8wZWp9MopuYQ93bURpOvuy/O\nmGa/Jp4wAxOtLAoJy5gcM8kCgYEAufShggeJZBwucVaZmtZuUVSrS8GLfUcZZFVV\n4YnSLv3L28CSYkQR5pTlptXGI1eTuyAqbhlHVVfPBq74nS77cJGAoj0t11yUm+td\ntpPZOHxXgbWSD+7t0dj7w6yjX9R8xH7cOLRUIAf57paq1X1BPW6Yu/gS8F9cZpm9\n/bRtiY0CgYEAtHdAhQUfelVyHCtTZ2fA7v9isfSYtPvr0yH9oMrHx1T5nKFlwmQG\ntwYT7xbX9YR3n2j/Hudg4VEetxdBanKiit+CvQMkLyW2Y71wE4bnYXUQzpAOnJAD\nVJNfCvQ64iYAjI7NRJ7YZLuoblJnnxLdE8lY6FDd6vWNDKXqEcfESkECgYBmjXpQ\nyrVDp6MZUGgwE1gNtIMvqVKzSXXAdquBUc+/qKo3zDEuzlmM78rjQnweW5sWlPux\ncnF7qIx9JBvqG9IBV804LENOxTkT8C7jlRAz7acY2rjt3pf7pg3a8Se8nuQcPdZX\n02Odsqhso10dlhFXvtmuuHZBaGX+E4XLGClctQKBgGND8mW9kUOx2VYkqR5ksfZi\nKD2YLKdpFrjXhdtcleDM9o2hm/7EvzHqDiT7l3llgNyXcbJ2DqU7slJEac2IwDaK\npAXA3bbUGlYXlciHvW8+esQCvaIoNg5vpAv8nYIfJu63/WIebv1aQoyVpySnOdtz\ng37VGhkHcl0ZJ/a9a7J/\n-----END PRIVATE KEY-----\n",
+  "client_email": "adminbigtable@forward-venture-415212.iam.gserviceaccount.com",
+  "client_id": "111367293911747623061",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/adminbigtable%40forward-venture-415212.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+        
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+        <!-- Vehicle types-->
+        <!--evehicle class vehicles-->
+        <!-- https://sumo.dlr.de/docs/Vehicle_Type_Parameter_Defaults.html -->
+        <!--Ford Mondeo 4 2.0 TDCi 130 Auto maxspeed is 200km/h-->
+        <vType id="e_car" vClass="pedestrian" maxSpeed="55.6"/>
+        <vType id="e_bike_1" vClass="pedestrian" maxSpeed="6.94"/>
+        <vType id="e_scooter_1" vClass="pedestrian" maxSpeed="6.94"/>
+        <!-- https://en.wikipedia.org/wiki/Preferred_walking_speed -->
+        <vType id="pedestrian" vClass="pedestrian" maxSpeed="1.42"/>
+</routes>
