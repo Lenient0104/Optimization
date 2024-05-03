@@ -263,7 +263,7 @@ test_size = len(od_pairs)
 optimizer = None
 
 # Define episodes
-episodes = [400]
+episodes = [2000]
 simulation_time = [0, 10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000]
 done = False
 
@@ -274,7 +274,7 @@ all_successful_tests = []
 
 
 # Create a new CSV file to store the results
-with open('results/DQN_experiment_results_simulation', 'w', newline='') as file:
+with open('results/DQN_experiment_results_simulation_2000_episode', 'w', newline='') as file:
     writer = csv.writer(file)
     # Write the header of the CSV file
     writer.writerow(['Experiment ID', 'Episode', 'Simulation Time', 'Execution Time (seconds)', 'Travel Time Cost (seconds)', 'Find'])

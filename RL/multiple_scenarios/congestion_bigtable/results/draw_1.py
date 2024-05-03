@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 # Load the data from all three files
 file_aco = "ACO-results-simulation_time.csv"
 file_q_learning = "Q_learning_results_simulation.csv"
-file_dqn = "DQN_experiment_results_simulation.csv"
+file_dqn = "DQN_experiment_results_simulation_2000_episode"
 
 # Read the CSV files into DataFrame
 df_aco = pd.read_csv(file_aco)

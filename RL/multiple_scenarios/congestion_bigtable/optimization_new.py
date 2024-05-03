@@ -4,7 +4,7 @@ import re
 import sqlite3
 import time
 import xml.etree.ElementTree as ET
-import queryTest
+# import queryTest
 import matplotlib.pyplot as plt
 import networkx as nx
 from tqdm import tqdm
