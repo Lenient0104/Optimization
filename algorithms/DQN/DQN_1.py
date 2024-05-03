@@ -75,7 +75,7 @@ class Environment:
         self.current_node = next_node
         self.visited_nodes.add(next_node)
         # The reward is now the negative of the time cost
-        reward = 1 / time_cost
+        reward = -time_cost
 
         # Check if the destination has been reached
         done = self.current_node == self.destination
@@ -218,7 +218,7 @@ def infer_best_route(agent, env, max_steps=1000):
         if done:
             best_route.append(info['action_taken'][0])
             best_modes.append(info['mode'])
-            total_time_cost += 1 / reward
+            total_time_cost -= reward
 
             print(best_route)
             print(best_modes)
@@ -227,7 +227,7 @@ def infer_best_route(agent, env, max_steps=1000):
 
         best_route.append(info['action_taken'][0])
         best_modes.append(info['mode'])
-        total_time_cost += 1 / reward
+        total_time_cost -= reward
 
         state = next_state
         steps += 1
@@ -280,12 +280,12 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number):
                 break  # Avoid looping in the same state
             state = next_state
             total_reward += reward
-            #
-            # if done:
-            #     print(done)
-            #     print(total_rewards)
-            #     print(rewards_count)
-            #     print(route)
+
+            if done:
+                print(done)
+                print(total_rewards)
+                print(rewards_count)
+                print(route)
 
             if len(agent.memory) > 16:
                 agent.replay()

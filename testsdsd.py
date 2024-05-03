@@ -28,10 +28,10 @@ class Environment:
         self.current_node = self.source
         self.remaining_energy = self.initial_energy  # Reset remaining energy
         self.last_mode = 'walking'  # Reset the last mode used
-        return self._get_state()
+        return self._get_state(self.current_node)
 
-    def _get_state(self):
-        current_node_index = list(self.graph.nodes).index(self.current_node)
+    def _get_state(self, node):
+        current_node_index = list(self.graph.nodes).index(node)
         state = np.array([current_node_index])
         return state
 
@@ -44,12 +44,13 @@ class Environment:
         selected_action = possible_actions[action_index]
 
         next_node, mode, edge_data = selected_action
+        # print("next node 2", next_node)
 
         if next_node == self.current_node or next_node in self.visited_nodes:
             # print('loop')
-            reward = -100000
+            reward = -10000000000000000
             info = {'current_node': self.current_node, 'mode': mode, 'action_taken': 'Loop detected'}
-            return self._get_state(), reward, False, info
+            return self._get_state(self.current_node), reward, False, info
 
         # Fetch edge data using the current node, next node, and mode
         edge_data = self.graph[self.current_node][next_node][mode]
@@ -67,26 +68,29 @@ class Environment:
             # print("no enough energy")
             # Action not feasible due to energy constraint, so don't change mode
             info = {'current_node': self.current_node, 'mode': self.last_mode, 'action_taken': 'Insufficient energy'}
-            return self._get_state(), -100000, False, info  # Now includes info
+            return self._get_state(self.current_node), -10000000000000, False, info  # Now includes info
 
         self.last_mode = mode  # Update the last mode used
         # Update energy and current node as the action is feasible
         self.remaining_energy -= energy_consumed
-        self.current_node = next_node
-        self.visited_nodes.add(next_node)
+        # self.current_node = next_node
+        # self.visited_nodes.add(next_node)
         # The reward is now the negative of the time cost
-        reward = 1 / time_cost
+        reward = 10000000 / time_cost
 
         # Check if the destination has been reached
-        done = self.current_node == self.destination
+        done = next_node == self.destination
+
+        # if done:
+        #     reward = 100
 
         info = {
-            'current_node': self.current_node,
+            'current_node': next_node,
             'mode': self.last_mode,
             'action_taken': selected_action  # Assuming `selected_action` is a descriptive action representation
         }
 
-        return self._get_state(), reward, done, info
+        return self._get_state(next_node), reward, done, info
 
     def calculate_energy_comsumption(self, current_mode, distance):
         if current_mode == 'walking':
@@ -218,18 +222,19 @@ def infer_best_route(agent, env, max_steps=1000):
         if done:
             best_route.append(info['action_taken'][0])
             best_modes.append(info['mode'])
-            total_time_cost += 1 / reward
+            total_time_cost += reward * 1 / 1000
 
-            print(best_route)
-            print(best_modes)
-            print(total_time_cost)
+            # print(best_route)
+            # print(best_modes)
+            # print(total_time_cost)
             return best_route, best_modes, total_time_cost, True
 
         best_route.append(info['action_taken'][0])
         best_modes.append(info['mode'])
-        total_time_cost += 1 / reward
+        total_time_cost += reward * 1 / 1000
 
         state = next_state
+        env.current_node = info['current_node']
         steps += 1
     # print('best route: ', best_route)
     return best_route, best_modes, total_time_cost, find
@@ -255,9 +260,9 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number):
     update_frequency = 10
 
     for episode in range(episode_number):
-        total_reward = 0
         state = env.reset()
         route = [env.current_node]
+        modes = []
         done = False
         total_rewards = 0
         rewards_count = []
@@ -270,22 +275,29 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number):
             ]
             num_available_actions = len(possible_actions)
             action = agent.act(state, num_available_actions, test=False)
+            next_node, mode, _ = possible_actions[action]
+            # print("next node 1", next_node)
             next_state, reward, done, info = env.step(action)
-            route.append(env.current_node)
             rewards_count.append(reward)
             total_rewards += reward
             agent.remember(state, action, reward, next_state, done)
-
-            if next_state == state:
+            print(route)
+            # print(reward)
+            # print(done)
+            if next_node in env.visited_nodes:
+                # print("loop")
                 break  # Avoid looping in the same state
-            state = next_state
-            total_reward += reward
-            #
+            env.current_node = next_node
+            route.append(env.current_node)
+            modes.append(mode)
             # if done:
             #     print(done)
             #     print(total_rewards)
             #     print(rewards_count)
             #     print(route)
+            #     print(modes)
+            env.visited_nodes.add(next_node)
+            state = next_state
 
             if len(agent.memory) > 16:
                 agent.replay()

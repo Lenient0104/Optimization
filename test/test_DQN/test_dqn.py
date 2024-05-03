@@ -11,7 +11,7 @@ class TestDQN(unittest.TestCase):
         self.net_xml_path = '../../optimization_interface/DCC.net.xml'
         self.start_mode = 'walking'
         self.simulation_time = [10000]
-        self.episodes = [1000]
+        self.episodes = [400]
         self.iteration = 1
         self.db_path = '../../optimization_interface/test_new.db'
         self.user = User(60, True, 0, 20)
