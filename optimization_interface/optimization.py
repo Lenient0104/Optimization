@@ -42,9 +42,11 @@ class Optimization:
 
     def choose_od_pairs(self):
         random.seed(88)
-        selected_pairs = random.sample(self.unique_edges, k=500 * 2)
-        od_pairs = [(selected_pairs[i], selected_pairs[i + 1]) for i in range(0, len(selected_pairs), 2)]
-        return od_pairs
+        random_pairs = []
+        for _ in range(500):
+            pair = random.sample(self.unique_edges, 2)
+            random_pairs.append(pair)
+        return random_pairs
 
     def parse_net_xml(self, filepath):
         pattern = r"^[A-Za-z]+"

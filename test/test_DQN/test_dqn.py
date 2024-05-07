@@ -1,7 +1,7 @@
 import csv
 import time
 import unittest
-from algorithms.DQN import DQN
+from algorithms.DQN import DQN_test_1
 from optimization_interface.user_info import User
 from optimization_interface.optimization import Optimization
 
@@ -18,13 +18,14 @@ class TestDQN(unittest.TestCase):
         self.done = False
 
     def test_run_dqn(self):
-        with open('../../optimization_interface/od_pairs/od_pairs_500.csv', 'r') as file:
+        with open('../../optimization_interface/od_pairs/od_pairs_500_new.csv', 'r') as file:
             reader = csv.reader(file)
             od_pairs = [tuple(row) for row in reader]
 
         test_size = len(od_pairs)
+        # test_size = 1
 
-        with open('results/DQN-results-simulation_time_new.csv', 'w', newline='') as file:
+        with open('results/test-new.csv', 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['Experiment ID', 'Number of Ants', 'Simulation Time', 'Travel Time Cost (seconds)',
                              'Execution Time (seconds)', 'Find'])
@@ -48,12 +49,11 @@ class TestDQN(unittest.TestCase):
                     if graph is None:
                         writer.writerow([test_size + 1, self.episodes[0], simulation, 0, 0, False])
                         continue
-                    best_route, best_modes, total_time_cost, execution_time, find = DQN.run_dqn(optimizer, source_edge,
-                                                                                                target_edge, self.episodes[0])
-                    # print(best_route)
-                    # print(best_modes)
-                    # print(total_time_cost)
-                    print("=============")
+                    best_route, best_modes, total_time_cost, execution_time, find = DQN_test_1.run_dqn(optimizer, source_edge,
+                                                                                                     target_edge, self.episodes[0])
+                    print(best_route)
+                    print(best_modes)
+                    print(total_time_cost)
                     # Write each test's result to the CSV file
                     experiment_id = f"{self.episodes[0]}-{test_index}"
                     writer.writerow([experiment_id, self.episodes[0], simulation, total_time_cost, execution_time, find])
