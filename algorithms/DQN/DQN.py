@@ -74,12 +74,14 @@ class Environment:
         self.remaining_energy -= energy_consumed
         self.current_node = next_node
         self.visited_nodes.add(next_node)
-        # The reward is now the negative of the time cost
-        reward = -time_cost
+        # The reward is now the negative of the time cost divided by distance to consider path length
+        reward = - time_cost
 
         # Check if the destination has been reached
         done = self.current_node == self.destination
 
+        # if done:
+        #     reward = 100
         info = {
             'current_node': self.current_node,
             'mode': self.last_mode,
@@ -103,7 +105,7 @@ class Environment:
 
 
 class DQN(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_dim=128):
+    def __init__(self, state_dim, action_dim, hidden_dim=512):
         super(DQN, self).__init__()
         self.net = nn.Sequential(
             nn.Linear(state_dim, hidden_dim),
@@ -118,8 +120,8 @@ class DQN(nn.Module):
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, hidden_dim=128, lr=0.5, gamma=0.95, epsilon=1.0, epsilon_decay=0.998,
-                 min_epsilon=0.01, buffer_size=100000, batch_size=64):
+    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.8, gamma=0.95, epsilon=1.0, epsilon_decay=0.99,
+                 min_epsilon=0.01, buffer_size=1000000, batch_size=16):
         self.state_dim = state_dim
         self.action_dim = action_dim
         # Experiences memory
@@ -165,14 +167,44 @@ class DQNAgent:
                 action = np.argmax(q_values_array)
             return action
 
-    def replay(self):
+    def replay(self, n_steps=3):
         if len(self.memory) < self.batch_size:
             return
         minibatch = random.sample(self.memory, self.batch_size)
-        states, actions, rewards, next_states, dones = zip(*minibatch)
+
+        states = []
+        actions = []
+        rewards = []
+        next_states = []
+        dones = []
+
+        for state, action, reward, next_state, done in minibatch:
+            total_reward = reward
+            current_state = state
+            current_next_state = next_state
+            current_done = done
+
+            # Start accumulating future rewards up to n_steps
+            future_steps = min(n_steps, self.batch_size - 1)  # Limit the number of steps to batch size
+            for _ in range(future_steps):
+                if current_done:
+                    break
+                # Get next experience from memory (simulate future steps)
+                future_action = np.random.choice(range(len(self.memory)))  # Randomly select a future action
+                _, _, future_reward, future_next_state, future_done = self.memory[future_action]
+
+                total_reward += (self.gamma ** future_steps) * future_reward
+                current_next_state = future_next_state
+                current_done = future_done
+
+            states.append(state)
+            actions.append(action)
+            rewards.append(total_reward)
+            next_states.append(current_next_state)
+            dones.append(current_done)
 
         # Convert lists of tuples to NumPy arrays with the correct shape
-        states = np.array(states, dtype=np.float32)  # states are shaped as (batch_size, 2)
+        states = np.array(states, dtype=np.float32)  # states are shaped as (batch_size, state_dim)
         next_states = np.array(next_states, dtype=np.float32)
 
         # Conversion to tensors
@@ -182,15 +214,22 @@ class DQNAgent:
         rewards = torch.FloatTensor(rewards)
         dones = torch.FloatTensor(dones)
 
+        # Compute Q values for the current states and actions
         current_q_values = self.model(states).gather(1, actions).squeeze(1)
-        next_q_values = self.target_model(next_states).max(1)[0]
-        expected_q_values = rewards + (1 - dones) * self.gamma * next_q_values
 
+        # Compute the maximum Q values for the next states
+        next_q_values = self.target_model(next_states).max(1)[0]
+
+        # Compute the expected Q values
+        expected_q_values = rewards + (1 - dones) * self.gamma ** n_steps * next_q_values
+
+        # Compute loss
         loss = self.loss_fn(current_q_values, expected_q_values.detach())
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
+        # Update epsilon
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
     def update_target_model(self):
@@ -198,7 +237,7 @@ class DQNAgent:
 
 
 # after all the training finished
-def infer_best_route(agent, env, max_steps=1000):
+def infer_best_route(agent, optimizer, env, max_steps=1000):
     state = env.reset()
     best_route = [env.current_node]
     best_modes = []
@@ -207,6 +246,7 @@ def infer_best_route(agent, env, max_steps=1000):
     find = False
 
     while steps < max_steps:
+        current_node = env.current_node
         possible_actions = [(neighbor, key, data) for neighbor in env.graph.neighbors(env.current_node)
                             for key, data in env.graph[env.current_node][neighbor].items()]
         # print(possible_actions)
@@ -217,21 +257,26 @@ def infer_best_route(agent, env, max_steps=1000):
         action = agent.act(state, num_available_actions, test=True)
 
         next_state, reward, done, info = env.step(action)
-        print(info)
+        if info['action_taken'] == 'Loop detected':
+            return best_route, best_modes, total_time_cost, find
+        distance = optimizer.new_graph[current_node][env.current_node][info['mode']]['distance']
+        time_cost = optimizer.new_graph[current_node][env.current_node][info['mode']]['weight']
+        print(distance, time_cost)
 
-        if done:
+        if info['action_taken'][0] == env.destination:
             best_route.append(info['action_taken'][0])
             best_modes.append(info['mode'])
-            total_time_cost -= reward
 
-            print(best_route)
-            print(best_modes)
-            print(total_time_cost)
+            total_time_cost += time_cost
+
+            # print(best_route)
+            # print(best_modes)
+            # print(total_time_cost)
             return best_route, best_modes, total_time_cost, True
 
         best_route.append(info['action_taken'][0])
         best_modes.append(info['mode'])
-        total_time_cost -= reward
+        total_time_cost += time_cost
 
         state = next_state
         steps += 1
@@ -265,6 +310,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number):
         done = False
         total_rewards = 0
         rewards_count = []
+        modes = []
 
         while not done:
             possible_actions = [
@@ -274,10 +320,12 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number):
             ]
             num_available_actions = len(possible_actions)
             action = agent.act(state, num_available_actions, test=False)
+            _, mode, _ = possible_actions[action]
             next_state, reward, done, info = env.step(action)
             route.append(env.current_node)
+            modes.append(mode)
             rewards_count.append(reward)
-            total_rewards += reward
+            total_rewards -= reward
             agent.remember(state, action, reward, next_state, done)
 
             if next_state == state:
@@ -286,12 +334,14 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number):
             total_reward += reward
             #
             # if done:
-            #     print(done)
-            #     print(total_rewards)
-            #     print(rewards_count)
+            #     print("=====================================")
+            #     print(modes)
             #     print(route)
+            #     print(total_rewards)
+            #     if total_rewards == 2293.3795851349782:
+            #         print("find")
 
-            if len(agent.memory) > 16:
+            if len(agent.memory) > 32:
                 agent.replay()
 
         if (episode + 1) % update_frequency == 0:
@@ -299,7 +349,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number):
 
     end_time = time.time()
     execution_time = end_time - start_time
-    best_route, best_modes, total_time_cost, find = infer_best_route(agent, env)
+    best_route, best_modes, total_time_cost, find = infer_best_route(agent, optimizer, env)
     total_time_cost = total_time_cost + optimizer.edge_map[target_edge]['length'] / 1.5
 
     if find:

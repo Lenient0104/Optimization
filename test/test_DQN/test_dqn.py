@@ -1,7 +1,7 @@
 import csv
 import time
 import unittest
-from algorithms.DQN import DQN_test_1
+from algorithms.DQN import DQN
 from optimization_interface.user_info import User
 from optimization_interface.optimization import Optimization
 
@@ -25,7 +25,7 @@ class TestDQN(unittest.TestCase):
         test_size = len(od_pairs)
         # test_size = 1
 
-        with open('results/test-new.csv', 'w', newline='') as file:
+        with open('results/test-new----7.csv', 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['Experiment ID', 'Number of Ants', 'Simulation Time', 'Travel Time Cost (seconds)',
                              'Execution Time (seconds)', 'Find'])
@@ -49,7 +49,7 @@ class TestDQN(unittest.TestCase):
                     if graph is None:
                         writer.writerow([test_size + 1, self.episodes[0], simulation, 0, 0, False])
                         continue
-                    best_route, best_modes, total_time_cost, execution_time, find = DQN_test_1.run_dqn(optimizer, source_edge,
+                    best_route, best_modes, total_time_cost, execution_time, find = DQN.run_dqn(optimizer, source_edge,
                                                                                                      target_edge, self.episodes[0])
                     print(best_route)
                     print(best_modes)
