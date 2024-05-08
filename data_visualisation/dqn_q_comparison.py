@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # 加载CSV文件
-df1 = pd.read_csv('../test/test_DQN/results/test-1.csv')
+df1 = pd.read_csv('../test/test_DQN/results/test-new.csv')
 df2 = pd.read_csv('../test/test_q_learning/results/test.csv')
 
 # 确保 "Find" 列为布尔型
@@ -26,7 +26,7 @@ plt.xlabel('Experiment ID')
 plt.ylabel('Travel Time Cost (seconds)')
 plt.title('Line Chart Comparison of Travel Time Cost When Find is True')
 plt.legend()
-plt.grid(True)
+# plt.grid(True)
 plt.xticks(rotation=45)  # Rotate labels for better readability
 plt.tight_layout()  # Adjust layout to not cut off labels
 plt.show()

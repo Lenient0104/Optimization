@@ -5,8 +5,9 @@
       <excludeFolder url="file://$MODULE_DIR$/optimisation_new" />
       <excludeFolder url="file://$MODULE_DIR$/venv" />
       <excludeFolder url="file://$MODULE_DIR$/optimisation_new_1" />
+      <excludeFolder url="file://$MODULE_DIR$/optimisation_newww" />
     </content>
-    <orderEntry type="inheritedJdk" />
+    <orderEntry type="jdk" jdkName="Python 3.12 (Optimization) (5)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

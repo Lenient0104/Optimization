@@ -43,7 +43,7 @@ def plot_box_plot_travel_time(filtered_data):
     # Prepare data for plotting
     # all_data = [filtered_data[filtered_data['Number of Ants'] == ant]['Travel Time Cost (seconds)'].dropna() for ant in
     #             unique_ants]
-    all_data = [filtered_data[filtered_data['Simulation Time'] == ant]['Travel Time Cost (seconds)'].dropna() for ant in
+    all_data = [filtered_data[filtered_data['Simulation Time'] == ant]['Execution Time (seconds)'].dropna() for ant in
                 unique_ants]
 
     # Plot box plot
@@ -51,8 +51,8 @@ def plot_box_plot_travel_time(filtered_data):
     plt.boxplot(all_data, labels=unique_ants)
     plt.xlabel('Simulation Time')
     plt.ylabel('Travel Time Cost (seconds)')
-    plt.title('ACO Box Plot of Travel Time Cost for Different Simulation Times')
-    plt.savefig('ACO Learning Box Plot of Travel Time Cost')
+    plt.title('DQN: Box Plot of Travel Time Cost for Different Simulation Times')
+    plt.savefig('DQN: Box Plot of Travel Time Cost')
     plt.show()
 
 
@@ -78,12 +78,12 @@ def plot_box_plot_execution_time(filtered_data):
     plt.boxplot(all_data, labels=unique_ants)
     plt.xlabel('Simulation Time')
     plt.ylabel('Execution Time (seconds)')
-    plt.title('ACO Learning Box Plot of Execution Time for Different Simulation Times')
-    plt.savefig('ACO Learning Box Plot of Execution Time')
+    plt.title('Q_Learning: Box Plot of Execution Time for Different Simulation Time')
+    plt.savefig('Q_Learning: Box Plot of Execution Time')
     plt.show()
 
 
 # Call the functions
-filtered_data = filter_data("ACO-simulation_time_new.csv")
-plot_box_plot_travel_time(filtered_data)
+filtered_data = filter_data("test-new.csv")
+# plot_box_plot_travel_time(filtered_data)
 plot_box_plot_execution_time(filtered_data)
