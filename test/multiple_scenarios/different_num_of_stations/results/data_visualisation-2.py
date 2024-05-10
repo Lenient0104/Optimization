@@ -51,8 +51,8 @@ def plot_box_plot_travel_time(filtered_data):
     plt.boxplot(all_data, labels=unique_ants)
     plt.xlabel('Station Number')
     plt.ylabel('Travel Time Cost (seconds)')
-    plt.title('ACO-1 Box Plot of Travel Time Cost for Different Station Numbers')
-    plt.savefig('ACO-1 Box Plot of Travel Time Cost')
+    plt.title('ACO Box Plot of Travel Time Cost for Different Station Numbers')
+    plt.savefig('ACO Box Plot of Travel Time Cost')
     plt.show()
 
 
@@ -78,13 +78,13 @@ def plot_box_plot_execution_time(filtered_data):
     plt.boxplot(all_data, labels=unique_ants)
     plt.xlabel('Station Number')
     plt.ylabel('Execution Time (seconds)')
-    plt.title('Q Learning Box Plot of Execution Time for Different Station Numbers')
+    plt.title('ACO Box Plot of Execution Time for Different Station Numbers')
     plt.autoscale()
-    plt.savefig('Q Learning Box Plot of Execution Time')
+    plt.savefig('ACO Box Plot of Execution Time')
     plt.show()
 
 
 # Call the functions
-filtered_data = filter_data("Q_learning_station-new.csv")
-# plot_box_plot_travel_time(filtered_data)
-plot_box_plot_execution_time(filtered_data)
+filtered_data = filter_data("final_modified.csv")
+plot_box_plot_travel_time(filtered_data)
+# plot_box_plot_execution_time(filtered_data)

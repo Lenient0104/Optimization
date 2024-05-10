@@ -99,7 +99,7 @@ class Ant:
     def move(self):
         current_location, current_mode, current_vehicle_id, _ = self.path[-1]
         all_possible_next_moves = self.find_all_next_moves(current_location)
-        move_probabilities = self.calculate_move_probabilities(all_possible_next_moves, 0.1, 1)
+        move_probabilities = self.calculate_move_probabilities(all_possible_next_moves, 0.2, 1)
         # print(move_probabilities)
         if move_probabilities is None:
             self.stop = True

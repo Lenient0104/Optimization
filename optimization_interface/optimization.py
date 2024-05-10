@@ -14,11 +14,12 @@ from .energy_models.e_scooter import Escooter_PowerConsumptionCalculator
 
 
 class Optimization:
-    def __init__(self, net_xml_path, user, db_path, simulation, start_edge, destination_edge):
+    def __init__(self, net_xml_path, user, db_path, simulation, station_num, start_edge, destination_edge):
         self.mode_stations = None
         self.new_graph = None
         self.user = user
         self.simulation = simulation
+        self.station_num = station_num
         self.unique_edges = []
         self.connections = []
         self.net_xml_path = net_xml_path
@@ -27,7 +28,7 @@ class Optimization:
         # Parse the XML file to get road and lane information
         self.edge_map = self.parse_net_xml(net_xml_path)
         # Map time to lanes using the provided CSV file
-        self.edges_station = self.get_stations(self.user)
+        self.edges_station = self.get_stations(self.user, station_num)
 
         # Insert energy model
         self.ecar_energymodel = ECar_EnergyConsumptionModel(4)
@@ -35,7 +36,6 @@ class Optimization:
         self.escooter_energymodel = Escooter_PowerConsumptionCalculator()
         # self.map_energy_to_lanes(60, 1)
         # self.map_station_availability()
-
 
         self.G = self.build_graph()
         self.new_graph = self.build_new_graph(start_edge, destination_edge)
@@ -83,18 +83,30 @@ class Optimization:
 
         return edge_detail_map
 
-    def get_stations(self, user):
+    def get_stations(self, user, station_num):
         # Ensure all edges initially have just a 'walking' station
         edge_stations = {edge_id: ['walking'] for edge_id in self.unique_edges}
 
         edge_to_assign = ['361409608#3', '3791905#2', '-11685016#2', '369154722#2', '244844370#0', '37721356#0',
                           '74233405#1', '129774671#0', '23395388#5', '-64270141']
-        # indices_to_assign = [50, 89, 112, 256, 309, 4000, 503, 8000, 30000, 10000]
+
+        edge_to_assign_new = ['361409608#3', '3791905#2', '-11685016#2', '369154722#2', '244844370#0', '37721356#0',
+                              '74233405#1', '129774671#0', '23395388#5', '-64270141', '18927706#0', '-42471880',
+                              '67138626#1',
+                              '41502636#0', '-75450412', '-23347664#1', '14151839#3', '-12341242#1', '-13904652',
+                              '-47638297#3']
+
         e_mobility_stations = user.preference
         if not user.driving_license and 'e_car' in user.preference:
             e_mobility_stations.remove('e_car')
-        for edge_id in edge_to_assign:
-            edge_stations[edge_id] = ['walking'] + e_mobility_stations
+        if station_num == 10:
+            for edge_id in edge_to_assign:
+                edge_stations[edge_id] = ['walking'] + e_mobility_stations
+        else:
+            random.seed(66)
+            edge_to_assign = random.sample(edge_to_assign_new, station_num)
+            for edge_id in edge_to_assign:
+                edge_stations[edge_id] = ['walking'] + e_mobility_stations
         return edge_stations
 
     def check_edge_existence(self, edge):
@@ -152,7 +164,7 @@ class Optimization:
                                                                 0)  # Get current level, default to 0 if not set
                         # Update pheromone level
                         updated_pheromone_level = current_pheromone_level + self.pheromone_deposit_function(
-                            ant.total_time_cost)
+                            ant.total_time_cost) * 100000000
                         # Set the updated pheromone level back on the edge
                         self.new_graph[edge_1][edge_2][key]['pheromone_level'] = updated_pheromone_level
 
