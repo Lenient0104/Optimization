@@ -35,7 +35,7 @@ class Environment:
         state = np.array([current_node_index])
         return state
 
-    def step(self, action_index, energy_rate):
+    def step(self, action_index):
         # Fetch all possible actions from the current node, including their mode as a key for lookup
         possible_actions = [(neighbor, key, data) for neighbor in self.graph.neighbors(self.current_node)
                             for key, data in self.graph[self.current_node][neighbor].items()]
@@ -60,7 +60,7 @@ class Environment:
 
         # Check for mode transfer and refill energy if there's a change in mode
         if mode != self.last_mode and self.last_mode is not None:
-            self.remaining_energy = 100 * energy_rate  # Refill energy on mode transfer
+            self.remaining_energy = 100  # Refill energy on mode transfer
 
         # Check if the action is feasible within the energy constraint
         if self.remaining_energy - energy_consumed < 0:
@@ -237,7 +237,7 @@ class DQNAgent:
 
 
 # after all the training finished
-def infer_best_route(agent, optimizer, env, energy_rate, max_steps=1000):
+def infer_best_route(agent, optimizer, env, max_steps=1000):
     state = env.reset()
     best_route = [env.current_node]
     best_modes = []
@@ -256,19 +256,9 @@ def infer_best_route(agent, optimizer, env, energy_rate, max_steps=1000):
 
         action = agent.act(state, num_available_actions, test=True)
 
-        next_state, reward, done, info = env.step(action, energy_rate)
-        if info['action_taken'] == 'Loop detected' or current_node == env.current_node:
-            print('==========')
-            print(info)
-            print('=============')
+        next_state, reward, done, info = env.step(action)
+        if info['action_taken'] == 'Loop detected':
             return best_route, best_modes, total_time_cost, find
-        # print("================")
-        # print(current_node)
-        # print(env.current_node)
-        # print(optimizer.new_graph[current_node])
-        # print(optimizer.new_graph[current_node][env.current_node])
-        # print("==================")
-
         distance = optimizer.new_graph[current_node][env.current_node][info['mode']]['distance']
         time_cost = optimizer.new_graph[current_node][env.current_node][info['mode']]['weight']
         print(distance, time_cost)
@@ -294,7 +284,7 @@ def infer_best_route(agent, optimizer, env, energy_rate, max_steps=1000):
     return best_route, best_modes, total_time_cost, find
 
 
-def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
+def run_dqn(optimizer, source_edge, target_edge, episode_number):
     all_DQN_exe_times = []
     all_DQN_times = []
     all_successful_tests = []
@@ -331,7 +321,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
             num_available_actions = len(possible_actions)
             action = agent.act(state, num_available_actions, test=False)
             _, mode, _ = possible_actions[action]
-            next_state, reward, done, info = env.step(action, energy_rate)
+            next_state, reward, done, info = env.step(action)
             route.append(env.current_node)
             modes.append(mode)
             rewards_count.append(reward)
@@ -359,7 +349,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
 
     end_time = time.time()
     execution_time = end_time - start_time
-    best_route, best_modes, total_time_cost, find = infer_best_route(agent, optimizer, env, energy_rate)
+    best_route, best_modes, total_time_cost, find = infer_best_route(agent, optimizer, env)
     total_time_cost = total_time_cost + optimizer.edge_map[target_edge]['length'] / 1.5
 
     if find:

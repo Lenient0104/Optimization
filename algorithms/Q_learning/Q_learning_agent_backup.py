@@ -90,7 +90,7 @@ class MultiModalQLearningAgent:
         # Decay epsilon to reduce exploration over time
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
-    def learn(self, start, destination, episodes, energy_rate, progress_check_interval=100, initial_energy=100):
+    def learn(self, start, destination, episodes, progress_check_interval=100, initial_energy=100):
         for episode in range(1, episodes + 1):
             step = 0
             current_state = start
@@ -106,7 +106,7 @@ class MultiModalQLearningAgent:
 
                 # Check for a mode change, and if so, reset the energy
                 if last_mode is not None and mode != last_mode:
-                    current_energy = 100 * energy_rate  # Reset energy to 100 on mode change
+                    current_energy = 100  # Reset energy to 100 on mode change
                 last_mode = mode  # Update the last mode used
 
                 distance = self.graph[current_state][next_state][mode]['weight']
@@ -176,10 +176,10 @@ class MultiModalQLearningAgent:
         return route, modes, total_time, find
 
 
-def run_q_learning(optimizer, source_edge, target_edge, episode_number, energy_rate):
+def run_q_learning(optimizer, source_edge, target_edge, episode_number):
     agent = MultiModalQLearningAgent(optimizer.new_graph)
     start_time = tm.time()
-    agent.learn(source_edge, target_edge, episode_number, energy_rate)
+    agent.learn(source_edge, target_edge, episode_number)
     best_route, best_modes, time_cost, find = agent.print_optimal_path(source_edge, target_edge)
     time_cost = time_cost + optimizer.edge_map[target_edge]['length'] / 1.5
     end_time = tm.time()
