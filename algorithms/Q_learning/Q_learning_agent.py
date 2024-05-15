@@ -4,7 +4,7 @@ import time as tm
 
 
 class MultiModalQLearningAgent:
-    def __init__(self, graph, alpha=0.1, gamma=0.95, epsilon=1.0, epsilon_decay=0.99, min_epsilon=0.01):
+    def __init__(self, graph, alpha=0.1, gamma=0.95, epsilon=1.0, epsilon_decay=0.999, min_epsilon=0.01):
         self.graph = graph
         self.alpha = alpha  # Learning rate
         self.gamma = gamma  # Discount factor
@@ -12,6 +12,7 @@ class MultiModalQLearningAgent:
         self.epsilon_decay = epsilon_decay  # Exploration decay rate
         self.min_epsilon = min_epsilon  # Minimum exploration rate
         self.q_table = {}
+        self.visitedNodes = set()
 
         self.initialize_q_table()
 
@@ -40,7 +41,7 @@ class MultiModalQLearningAgent:
         feasible_actions = []
         for action in actions:
             _, next_state, mode = action
-            distance = self.graph[state][next_state][mode]['weight']
+            distance = self.graph[state][next_state][mode]['distance']
             energy_consumed = self.calculate_energy_comsumption(mode, distance)
             # Assuming current_energy is the current energy level of the vehicle
             if current_energy - energy_consumed >= 0:  # Check if the action is feasible
@@ -49,9 +50,12 @@ class MultiModalQLearningAgent:
         if not feasible_actions:  # If no action is feasible due to energy constraints
             return None
         if random.uniform(0, 1) < self.epsilon:
+            print("random")
             return random.choice(feasible_actions)
         else:
             state_actions = {action: q for action, q in self.q_table.items() if action in feasible_actions}
+            # print(feasible_actions)
+            # print(state_actions)
             return max(state_actions, key=state_actions.get, default=None)
 
     def update_q_value(self, state, action, reward, current_energy):
@@ -73,7 +77,7 @@ class MultiModalQLearningAgent:
                     action_key = (next_state, neighbor, mode_key)
                     if action_key in self.q_table:
                         # Ensure next action is feasible with the remaining energy
-                        next_distance = self.graph[next_state][neighbor][mode_key]['weight']
+                        next_distance = self.graph[next_state][neighbor][mode_key]['distance']
                         next_energy_consumed = self.calculate_energy_comsumption(mode_key, next_distance)
                         if new_energy - next_energy_consumed >= 0:  # Check if the action is feasible with new energy
                             next_max = max(next_max, self.q_table[action_key])
@@ -90,44 +94,74 @@ class MultiModalQLearningAgent:
         # Decay epsilon to reduce exploration over time
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
-    def learn(self, start, destination, episodes, energy_rate, progress_check_interval=100, initial_energy=100):
+    def learn(self, start, destination, episodes, energy_rate, initial_energy, progress_check_interval=100):
         for episode in range(1, episodes + 1):
+            route = [start]
+            self.visitedNodes = set()
+            modes = []
+            travel_time = 0
             step = 0
+            initial_energy = initial_energy * energy_rate
             current_state = start
             current_energy = initial_energy  # Initialize the energy level for the vehicle at the start of the episode
             last_mode = None  # Track the last mode used
             done = False
             while not done:
+                # print("current state:", current_state)
                 action = self.choose_action(current_state, current_energy)
+
                 if action is None:  # No feasible action due to energy constraints
-                    # print("Ran out of energy, cannot proceed further in this episode.")
+                    print("Ran out of energy, cannot proceed further in this episode.")
                     break
+
                 _, next_state, mode = action
 
+                if current_state in self.visitedNodes:
+                    reward = -100
+                    self.update_q_value(current_state, action, reward, current_energy)
+                    break
+                self.visitedNodes.add(current_state)
                 # Check for a mode change, and if so, reset the energy
                 if last_mode is not None and mode != last_mode:
-                    current_energy = 100 * energy_rate  # Reset energy to 100 on mode change
+                    current_energy = initial_energy  # Reset energy to 100 on mode change
                 last_mode = mode  # Update the last mode used
+                # print(mode)
+                modes.append(last_mode)
 
-                distance = self.graph[current_state][next_state][mode]['weight']
+                time = self.graph[current_state][next_state][mode]['weight']
+                travel_time += time
+                distance = self.graph[current_state][next_state][mode]['distance']
                 energy_consumed = self.calculate_energy_comsumption(mode, distance)
                 current_energy -= energy_consumed  # Update energy level after taking the action
+                # print("current energy", current_energy)
+                if next_state == destination:
+                    print(route)
+                    print(modes)
+                    print(travel_time)
                 if step >= 4 and next_state == destination:
-                    reward = 0
+                    # if next_state == destination:
+                    #     print(route)
+                    #     print(modes)
+                    #     print(travel_time)
+                    reward = 10000000000
+                    # print("arrived")
                 else:
-                    reward = -self.graph[current_state][next_state][mode]['weight']
+                    reward = 100000 / self.graph[current_state][next_state][mode]['weight']
 
                 self.update_q_value(current_state, action, reward, current_energy)
 
                 current_state = next_state
+                route.append(current_state)
                 step += 1
                 if current_state == destination or current_energy <= 0:
                     done = True
+
 
             self.update_epsilon()
 
             if episode % progress_check_interval == 0:
                 print(f"Episode {episode}/{episodes} completed.")
+        print("Q-table:", self.q_table)
 
     def print_optimal_path(self, start, destination):
         print("Q-table:", self.q_table)
@@ -154,7 +188,6 @@ class MultiModalQLearningAgent:
 
             best_action = max(actions, key=lambda x: x[1])[0]
             _, next_state, mode = best_action
-            print()
             modes.append(mode)
             distance = self.graph[current_state][next_state][mode]['distance']
             time = self.graph[current_state][next_state][mode]['weight']
@@ -179,7 +212,7 @@ class MultiModalQLearningAgent:
 def run_q_learning(optimizer, source_edge, target_edge, episode_number, energy_rate):
     agent = MultiModalQLearningAgent(optimizer.new_graph)
     start_time = tm.time()
-    agent.learn(source_edge, target_edge, episode_number, energy_rate)
+    agent.learn(source_edge, target_edge, episode_number, energy_rate, 100)
     best_route, best_modes, time_cost, find = agent.print_optimal_path(source_edge, target_edge)
     time_cost = time_cost + optimizer.edge_map[target_edge]['length'] / 1.5
     end_time = tm.time()

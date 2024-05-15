@@ -89,6 +89,8 @@ class Optimization:
 
         edge_to_assign = ['361409608#3', '3791905#2', '-11685016#2', '369154722#2', '244844370#0', '37721356#0',
                           '74233405#1', '129774671#0', '23395388#5', '-64270141']
+        edge_to_assign_test = ['4395595#0', '-7989929#1', '-3238213', '-4253696#0', '4395609#0', '3785445#0', '-14047194#2',
+                               '-64265660#1', '7990024#0', '556290239#0', '-23076566', '14678903']
 
         edge_to_assign_new = ['361409608#3', '3791905#2', '-11685016#2', '369154722#2', '244844370#0', '37721356#0',
                               '74233405#1', '129774671#0', '23395388#5', '-64270141', '18927706#0', '-42471880',
@@ -100,7 +102,7 @@ class Optimization:
         if not user.driving_license and 'e_car' in user.preference:
             e_mobility_stations.remove('e_car')
         if station_num == 10:
-            for edge_id in edge_to_assign:
+            for edge_id in edge_to_assign_test:
                 edge_stations[edge_id] = ['walking'] + e_mobility_stations
         else:
             random.seed(66)
