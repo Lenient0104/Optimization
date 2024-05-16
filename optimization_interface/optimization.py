@@ -102,7 +102,7 @@ class Optimization:
         if not user.driving_license and 'e_car' in user.preference:
             e_mobility_stations.remove('e_car')
         if station_num == 10:
-            for edge_id in edge_to_assign_test:
+            for edge_id in edge_to_assign:
                 edge_stations[edge_id] = ['walking'] + e_mobility_stations
         else:
             random.seed(66)
