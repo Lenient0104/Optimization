@@ -2,9 +2,11 @@ import csv
 import random
 import time as tm
 
+from matplotlib import pyplot as plt
+
 
 class MultiModalQLearningAgent:
-    def __init__(self, graph, alpha=0.1, gamma=0.95, epsilon=1.0, epsilon_decay=0.99, min_epsilon=0.01):
+    def __init__(self, graph, alpha=0.1, gamma=0.95, epsilon=1.0, epsilon_decay=0.999, min_epsilon=0.01):
         self.graph = graph
         self.alpha = alpha  # Learning rate
         self.gamma = gamma  # Discount factor
@@ -90,14 +92,18 @@ class MultiModalQLearningAgent:
         # Decay epsilon to reduce exploration over time
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
-    def learn(self, start, destination, episodes, progress_check_interval=100, initial_energy=100):
+    def learn(self, start, destination, episodes, energy_rate, progress_check_interval=100, initial_energy=100):
+        total_times = []
         for episode in range(1, episodes + 1):
             step = 0
             total_time = 0
+            current_initial_energy = initial_energy * energy_rate
             current_state = start
-            current_energy = initial_energy  # Initialize the energy level for the vehicle at the start of the episode
+            current_energy = current_initial_energy  # Initialize the energy level for the vehicle at the start of the episode
+            # print('current energy:', current_energy)
             last_mode = None  # Track the last mode used
             done = False
+            max_step = 0
             while not done:
                 action = self.choose_action(current_state, current_energy)
                 if action is None:  # No feasible action due to energy constraints
@@ -116,15 +122,23 @@ class MultiModalQLearningAgent:
                 energy_consumed = self.calculate_energy_comsumption(mode, distance)
                 current_energy -= energy_consumed  # Update energy level after taking the action
                 if step >= 3 and next_state == destination:
-                    print(total_time)
+                    # print(total_time)
+                    total_times.append(total_time)
                     reward = 0
+
+
                 else:
                     reward = -self.graph[current_state][next_state][mode]['weight']
 
-                self.update_q_value(current_state, action, reward, current_energy)
 
+                pre_state = current_state
                 current_state = next_state
                 step += 1
+
+                # if current_state == destination and step <= 2:
+                #     reward = 10 * (-10000)
+
+                self.update_q_value(pre_state, action, reward, current_energy)
                 if current_state == destination or current_energy <= 0:
                     done = True
 
@@ -132,9 +146,12 @@ class MultiModalQLearningAgent:
 
             if episode % progress_check_interval == 0:
                 print(f"Episode {episode}/{episodes} completed.")
+        #
+        # plt.plot(total_times)
+        # plt.show()
 
     def print_optimal_path(self, start, destination):
-        print("Q-table:", self.q_table)
+
         current_state = start
         optimal_path = []
         route = [current_state]
@@ -180,10 +197,10 @@ class MultiModalQLearningAgent:
         return route, modes, total_time, find
 
 
-def run_q_learning(optimizer, source_edge, target_edge, episode_number):
+def run_q_learning(optimizer, source_edge, target_edge, episode_number, energy_rate):
     agent = MultiModalQLearningAgent(optimizer.new_graph)
     start_time = tm.time()
-    agent.learn(source_edge, target_edge, episode_number)
+    agent.learn(source_edge, target_edge, episode_number, energy_rate)
     best_route, best_modes, time_cost, find = agent.print_optimal_path(source_edge, target_edge)
     time_cost = time_cost + optimizer.edge_map[target_edge]['length'] / 1.5
     end_time = tm.time()
