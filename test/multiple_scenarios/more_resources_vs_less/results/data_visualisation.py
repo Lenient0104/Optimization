@@ -17,7 +17,7 @@ def filter_data(csv_file):
     data = pd.read_csv(csv_file)
 
     # Filter out rows where Travel Time Cost is not False
-    filtered_data = data[data['Find'] != False]
+    filtered_data = data[(data['Find'] != False) & (data['Initial Energy'] != 0.01)]
 
     data['Find'] = data['Find'].replace({'TRUE': True, 'FALSE': False})
 
@@ -52,7 +52,7 @@ def plot_box_plot_travel_time(filtered_data):
     plt.xlabel('Initial Energy')
     plt.ylabel('Travel Time Cost (seconds)')
     plt.title('Q learning Box Plot of Travel Time Cost for Different Initial Energy')
-    plt.savefig('Q learning Learning Box Plot of Travel Time Cost4')
+    plt.savefig('Q learning Learning Box Plot of Travel Time Cost5')
     plt.show()
 
 
@@ -80,11 +80,11 @@ def plot_box_plot_execution_time(filtered_data):
     plt.ylabel('Execution Time (seconds)')
     plt.title('Q learning Box Plot of Execution Time for Different Initial Energy')
     plt.autoscale()
-    plt.savefig('Q learning Learning Box Plot of Execution Time4')
+    plt.savefig('Q learning Learning Box Plot of Execution Time5')
     plt.show()
 
 
 # Call the functions
-filtered_data = filter_data("test519.csv")
+filtered_data = filter_data("test519-1.csv")
 plot_box_plot_travel_time(filtered_data)
 plot_box_plot_execution_time(filtered_data)

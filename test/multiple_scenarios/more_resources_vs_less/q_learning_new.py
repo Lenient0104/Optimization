@@ -3,7 +3,7 @@ import time
 import networkx as nx
 import matplotlib.pyplot as plt
 import unittest
-from algorithms.Q_learning import Q_learning_agent_backup
+from algorithms.Q_learning import Q_learning_agent
 from optimization_interface.user_info import User
 from optimization_interface.optimization import Optimization
 

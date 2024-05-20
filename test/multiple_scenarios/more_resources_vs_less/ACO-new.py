@@ -15,8 +15,9 @@ class Analysis(unittest.TestCase):
         self.net_xml_path = '../../../optimization_interface/DCC.net.xml'
         self.start_mode = 'walking'
         self.ant_num = [350]
-        self.station_num = [5, 10, 15, 20]
+        self.station_num = [10]
         self.simulation_time = [20000]
+        self.energy_rate = [0.05, 0.07, 0.1, 1]
         self.episodes = [500, 1000, 1500, 2000]
         self.iteration = 1
         self.db_path = '../../../optimization_interface/test_new.db'
@@ -31,7 +32,7 @@ class Analysis(unittest.TestCase):
         all_aco_exe_time_costs = []
         all_aco_time_costs = []
 
-        with open('results/test-test.csv', 'w', newline='') as file:
+        with open('results/ACO-energy.csv', 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['Experiment ID', 'Number of Ants', 'Simulation Time', 'Station Number', 'Travel Time Cost (seconds)',
                              'Execution Time (seconds)', 'Find'])
