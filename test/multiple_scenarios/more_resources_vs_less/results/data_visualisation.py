@@ -40,6 +40,7 @@ def plot_box_plot_travel_time(filtered_data):
     # unique_episodes = filtered_data['Episode'].unique()
     unique_ants = filtered_data['Initial Energy'].unique()
 
+
     # Prepare data for plotting
     # all_data = [filtered_data[filtered_data['Number of Ants'] == ant]['Travel Time Cost (seconds)'].dropna() for ant in
     #             unique_ants]
@@ -52,7 +53,7 @@ def plot_box_plot_travel_time(filtered_data):
     plt.xlabel('Initial Energy')
     plt.ylabel('Travel Time Cost (seconds)')
     plt.title('Q learning Box Plot of Travel Time Cost for Different Initial Energy')
-    plt.savefig('Q learning Learning Box Plot of Travel Time Cost5')
+    plt.savefig('Q learning Learning Box Plot of Travel Time Cost6')
     plt.show()
 
 
@@ -80,11 +81,11 @@ def plot_box_plot_execution_time(filtered_data):
     plt.ylabel('Execution Time (seconds)')
     plt.title('Q learning Box Plot of Execution Time for Different Initial Energy')
     plt.autoscale()
-    plt.savefig('Q learning Learning Box Plot of Execution Time5')
+    plt.savefig('Q learning Learning Box Plot of Execution Time6')
     plt.show()
 
 
 # Call the functions
-filtered_data = filter_data("test519-1.csv")
+filtered_data = filter_data("test521.csv")
 plot_box_plot_travel_time(filtered_data)
 plot_box_plot_execution_time(filtered_data)
