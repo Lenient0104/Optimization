@@ -8,9 +8,9 @@ import networkx as nx
 
 from tqdm import tqdm
 # from big_table_interface import queryTest
-from .energy_models.e_bike import Ebike_PowerConsumptionCalculator
-from .energy_models.e_car import ECar_EnergyConsumptionModel
-from .energy_models.e_scooter import Escooter_PowerConsumptionCalculator
+# from .energy_models.e_bike import Ebike_PowerConsumptionCalculator
+# from .energy_models.e_car import ECar_EnergyConsumptionModel
+# from .energy_models.e_scooter import Escooter_PowerConsumptionCalculator
 
 
 class Optimization:
@@ -31,9 +31,9 @@ class Optimization:
         self.edges_station = self.get_stations(self.user, station_num)
 
         # Insert energy model
-        self.ecar_energymodel = ECar_EnergyConsumptionModel(4)
-        self.ebike_energymodel = Ebike_PowerConsumptionCalculator()
-        self.escooter_energymodel = Escooter_PowerConsumptionCalculator()
+        # self.ecar_energymodel = ECar_EnergyConsumptionModel(4)
+        # self.ebike_energymodel = Ebike_PowerConsumptionCalculator()
+        # self.escooter_energymodel = Escooter_PowerConsumptionCalculator()
         # self.map_energy_to_lanes(60, 1)
         # self.map_station_availability()
 
