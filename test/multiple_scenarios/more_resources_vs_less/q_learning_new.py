@@ -13,7 +13,7 @@ class TestDQN(unittest.TestCase):
         self.net_xml_path = '../../../optimization_interface/DCC.net.xml'
         self.start_mode = 'walking'
         self.station_num = [10]
-        self.energy_rate = [0.2]
+        self.energy_rate = [0.3, 0.4, 0.5, 0.6]
         self.simulation_time = [20000]
         self.episodes = [1000]
         self.iteration = 1
@@ -30,7 +30,7 @@ class TestDQN(unittest.TestCase):
         # test_size = 1
         # test_od_pairs = ('3191574', '22770275#2')
 
-        with open('results/test02.csv', 'w', newline='') as file:
+        with open('results/test015.csv', 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['Experiment ID', 'Episode', 'Simulation Time', 'Station Number', 'Initial Energy', 'Travel Time Cost (seconds)',
                              'Execution Time (seconds)', 'Find'])
