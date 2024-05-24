@@ -4,8 +4,9 @@ import time
 
 class Ant:
 
-    def __init__(self, start_edge, dest_edge, db_connection, mode_stations, index, graph, mode='walking'):
+    def __init__(self, start_edge, dest_edge, db_connection, mode_stations, index, graph, energy_rate, mode='walking'):
         self.graph = graph
+        self.energy_rate = energy_rate
         self.mode_stations = mode_stations
         self.index = index
         self.stop = False
@@ -190,7 +191,7 @@ class Ant:
                     #         self.path_length + self.find_edge_length(next_edge))
                     heuristic = 1
                 else:
-                    new_vehicle_id, new_energy_level = self.get_best_vehicle(mode)
+                    _, new_energy_level = self.get_best_vehicle(mode)
                     energy_factor = new_energy_level / 100
 
                 # Calculate the overall probability components
@@ -245,15 +246,15 @@ class Ant:
             return "pedestrian", "pedestrian"
         if mode == 'e_bike_1':
             e_bike_id = 'eb' + str(random.randint(0, 10))
-            soc = random.randint(90, 100)
+            soc = 100 * self.energy_rate
             return e_bike_id, soc
         elif mode == 'e_scooter_1':
             e_scooter_id = 'es' + str(random.randint(0, 10))
-            soc = random.randint(90, 100)
+            soc = 100 * self.energy_rate
             return e_scooter_id, soc
         elif mode == 'e_car':
             e_car_id = 'ec' + str(random.randint(0, 10))
-            soc = random.randint(90, 100)
+            soc = 100 * self.energy_rate
             return e_car_id, soc
 
     def calculate_energy_comsumption(self, current_mode, distance):
@@ -355,6 +356,7 @@ class Ant:
 
     def update_ant_state(self, next_move):
         # real move
+        # print('remaning energy', self.remaining_energy)
         current_loc, current_mode, current_vehicle_id, _ = self.path[-1]
         next_edge, mode, distance, time_cost = next_move
 
@@ -452,7 +454,7 @@ def find_best_path(ants, destination_edge, pheromones):
     return best_ant
 
 
-def run_aco_algorithm(optimizer, start_edge, destination_edge, number_of_ants, mode='walking'):
+def run_aco_algorithm(optimizer, start_edge, destination_edge, number_of_ants, energy_rate, mode='walking'):
     start_time = time.time()
     if start_edge not in optimizer.unique_edges:
         print(f"There's no edge {start_edge} in this map.")
@@ -481,7 +483,7 @@ def run_aco_algorithm(optimizer, start_edge, destination_edge, number_of_ants, m
     # print(self.edges_station)
     for ant_num in range(number_of_ants):
         ant = Ant(start_edge, destination_edge, optimizer.db_connection, optimizer.mode_stations, ant_index,
-                  optimizer.new_graph, mode)
+                  optimizer.new_graph, energy_rate, mode)
         print("ant", ant_index)
         move_count = 0
         while ant.path[-1][0] != destination_edge and ant.stop is False:
