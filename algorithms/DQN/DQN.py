@@ -1,3 +1,4 @@
+import sys
 import time
 import torch
 import random
@@ -8,16 +9,18 @@ from collections import deque
 
 
 class Environment:
-    def __init__(self, graph, source, destination, initial_energy=100):
+    def __init__(self, graph, source, destination, energy_rate, initial_energy=100):
         self.graph = graph
         self.source = source
+        self.total_time_cost = 0
         self.destination = destination
         self.current_node = source
         self.remaining_energy = initial_energy
-        self.initial_energy = initial_energy
+        self.initial_energy = initial_energy * energy_rate
         self.last_mode = 'walking'
         self.visited_nodes = set()
         self.reset()
+        self.steps = 0
 
     def get_possible_actions(self, node):
         return [(neighbor, key, data) for neighbor in self.graph.neighbors(node)
@@ -26,6 +29,8 @@ class Environment:
     def reset(self):
         self.visited_nodes = set()
         self.current_node = self.source
+        self.total_time_cost = 0
+        self.steps = 0
         self.remaining_energy = self.initial_energy  # Reset remaining energy
         self.last_mode = 'walking'  # Reset the last mode used
         return self._get_state()
@@ -35,7 +40,7 @@ class Environment:
         state = np.array([current_node_index])
         return state
 
-    def step(self, action_index, energy_rate):
+    def step(self, action_index):
         # Fetch all possible actions from the current node, including their mode as a key for lookup
         possible_actions = [(neighbor, key, data) for neighbor in self.graph.neighbors(self.current_node)
                             for key, data in self.graph[self.current_node][neighbor].items()]
@@ -49,7 +54,7 @@ class Environment:
             # print('loop')
             reward = -100000
             info = {'current_node': self.current_node, 'mode': mode, 'action_taken': 'Loop detected'}
-            return self._get_state(), reward, False, info
+            return self._get_state(), reward, True, info
 
         # Fetch edge data using the current node, next node, and mode
         edge_data = self.graph[self.current_node][next_node][mode]
@@ -60,14 +65,15 @@ class Environment:
 
         # Check for mode transfer and refill energy if there's a change in mode
         if mode != self.last_mode and self.last_mode is not None:
-            self.remaining_energy = 100 * energy_rate  # Refill energy on mode transfer
+            self.remaining_energy = self.initial_energy
+            # print(self.remaining_energy, self.initial_energy)# Refill energy on mode transfer
 
         # Check if the action is feasible within the energy constraint
         if self.remaining_energy - energy_consumed < 0:
             # print("no enough energy")
             # Action not feasible due to energy constraint, so don't change mode
             info = {'current_node': self.current_node, 'mode': self.last_mode, 'action_taken': 'Insufficient energy'}
-            return self._get_state(), -100000, False, info  # Now includes info
+            return self._get_state(), -1000000, True, info  # Now includes info
 
         self.last_mode = mode  # Update the last mode used
         # Update energy and current node as the action is feasible
@@ -76,12 +82,16 @@ class Environment:
         self.visited_nodes.add(next_node)
         # The reward is now the negative of the time cost divided by distance to consider path length
         reward = - time_cost
+        self.steps += 1
+
+        self.total_time_cost += time_cost
 
         # Check if the destination has been reached
         done = self.current_node == self.destination
 
-        # if done:
-        #     reward = 100
+        if done and self.steps >= 2:
+            reward = 1 / self.total_time_cost
+            # print(self.total_time_cost)
         info = {
             'current_node': self.current_node,
             'mode': self.last_mode,
@@ -114,14 +124,17 @@ class DQN(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, action_dim)
         )
+        # 初始化最后一层的权重和偏置以使初始Q值为-200
+        self.net[-1].weight.data.fill_(0)  # 将权重初始化为0
+        self.net[-1].bias.data.fill_(-200)  # 将偏置初始化为-200
 
     def forward(self, x):
         return self.net(x)
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.8, gamma=0.95, epsilon=1.0, epsilon_decay=0.99,
-                 min_epsilon=0.01, buffer_size=1000000, batch_size=16):
+    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.12, gamma=0, epsilon=1.0, epsilon_decay=0.99,
+                 min_epsilon=0.01, buffer_size=5000, batch_size=32):
         self.state_dim = state_dim
         self.action_dim = action_dim
         # Experiences memory
@@ -157,17 +170,23 @@ class DQNAgent:
         else:
             if np.random.rand() < self.epsilon:
                 action = random.randrange(num_actions)
-                # print("random")
+                state = torch.FloatTensor(state).unsqueeze(0)
+                with torch.no_grad():
+                    q_values = self.model(state)
+                q_values_array = q_values.cpu().numpy()[0][:num_actions]
+                action_q_value = q_values_array[action]
+                print("random q value:", action_q_value)
             else:
-                # print("max")
                 state = torch.FloatTensor(state).unsqueeze(0)
                 with torch.no_grad():
                     q_values = self.model(state)
                 q_values_array = q_values.cpu().numpy()[0][:num_actions]
                 action = np.argmax(q_values_array)
+                max_q_value = np.max(q_values_array)
+                print("max q value:", max_q_value)
             return action
 
-    def replay(self, n_steps=3):
+    def replay(self, n_steps=1):
         if len(self.memory) < self.batch_size:
             return
         minibatch = random.sample(self.memory, self.batch_size)
@@ -180,7 +199,6 @@ class DQNAgent:
 
         for state, action, reward, next_state, done in minibatch:
             total_reward = reward
-            current_state = state
             current_next_state = next_state
             current_done = done
 
@@ -237,7 +255,7 @@ class DQNAgent:
 
 
 # after all the training finished
-def infer_best_route(agent, optimizer, env, energy_rate, max_steps=1000):
+def infer_best_route(agent, optimizer, env, max_steps=1000):
     state = env.reset()
     best_route = [env.current_node]
     best_modes = []
@@ -256,7 +274,7 @@ def infer_best_route(agent, optimizer, env, energy_rate, max_steps=1000):
 
         action = agent.act(state, num_available_actions, test=True)
 
-        next_state, reward, done, info = env.step(action, energy_rate)
+        next_state, reward, done, info = env.step(action)
         if info['action_taken'] == 'Loop detected' or current_node == env.current_node:
             print('==========')
             print(info)
@@ -271,7 +289,7 @@ def infer_best_route(agent, optimizer, env, energy_rate, max_steps=1000):
 
         distance = optimizer.new_graph[current_node][env.current_node][info['mode']]['distance']
         time_cost = optimizer.new_graph[current_node][env.current_node][info['mode']]['weight']
-        print(distance, time_cost)
+        # print(distance, time_cost)
 
         if info['action_taken'][0] == env.destination:
             best_route.append(info['action_taken'][0])
@@ -294,6 +312,22 @@ def infer_best_route(agent, optimizer, env, energy_rate, max_steps=1000):
     return best_route, best_modes, total_time_cost, find
 
 
+def print_output():
+    # 保存原始的 stdout 方便之后恢复
+    original_stdout = sys.stdout
+
+    # 打开一个文件用于写入输出
+    with open('output_file.txt', 'w') as f:
+        sys.stdout = f  # 将 stdout 指向文件
+        # 运行你的代码
+        print("这是输出到文件的内容。")
+
+    # 恢复原始 stdout
+    sys.stdout = original_stdout
+
+    print("这是输出到标准输出的内容。")
+
+
 def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
     all_DQN_exe_times = []
     all_DQN_times = []
@@ -308,17 +342,17 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
         len(list(optimizer.new_graph.out_edges(node))) for node in
         optimizer.new_graph.nodes)  # Max number of possible actions from any node
 
-    env = Environment(optimizer.new_graph, source_edge, target_edge)
+    env = Environment(optimizer.new_graph, source_edge, target_edge, energy_rate)
     agent = DQNAgent(state_dim, action_dim)
     start_time = time.time()
     update_frequency = 10
 
     for episode in range(episode_number):
         total_reward = 0
+        env.total_time_cost = 0
         state = env.reset()
         route = [env.current_node]
         done = False
-        total_rewards = 0
         rewards_count = []
         modes = []
 
@@ -331,35 +365,39 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
             num_available_actions = len(possible_actions)
             action = agent.act(state, num_available_actions, test=False)
             _, mode, _ = possible_actions[action]
-            next_state, reward, done, info = env.step(action, energy_rate)
+            next_state, reward, done, info = env.step(action)
+            print(reward)
+            print(info)
             route.append(env.current_node)
             modes.append(mode)
             rewards_count.append(reward)
-            total_rewards -= reward
+            # env.total_time_cost -= reward
             agent.remember(state, action, reward, next_state, done)
+            total_size = sum(sys.getsizeof(x) for x in (state, action, reward, next_state, done))
 
-            if next_state == state:
-                break  # Avoid looping in the same state
+            # print("Approximate size of the tuple in bytes:", total_size)
+
+            # if next_state == state:
+            #     break  # Avoid looping in the same state
             state = next_state
             total_reward += reward
             #
-            # if done:
-            #     print("=====================================")
-            #     print(modes)
-            #     print(route)
-            #     print(total_rewards)
-            #     if total_rewards == 2293.3795851349782:
-            #         print("find")
+            if done:
+                print("done")
+            # # #     print(modes)
+            # # #     print(route)
+            # #     print(env.steps)
+            #     print(env.total_time_cost)
 
-            if len(agent.memory) > 32:
+            if len(agent.memory) > 64:
                 agent.replay()
 
         if (episode + 1) % update_frequency == 0:
             agent.update_target_model()
-
+    memory = agent.memory
     end_time = time.time()
     execution_time = end_time - start_time
-    best_route, best_modes, total_time_cost, find = infer_best_route(agent, optimizer, env, energy_rate)
+    best_route, best_modes, total_time_cost, find = infer_best_route(agent, optimizer, env)
     total_time_cost = total_time_cost + optimizer.edge_map[target_edge]['length'] / 1.5
 
     if find:
@@ -369,5 +407,5 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
 
     all_DQN_exe_times.append(episode_exe_times)
     all_DQN_times.append(episode_times)
-
+    print_output()
     return best_route, best_modes, total_time_cost, execution_time, find

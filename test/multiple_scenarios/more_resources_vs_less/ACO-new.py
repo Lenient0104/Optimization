@@ -14,10 +14,11 @@ class Analysis(unittest.TestCase):
     def setUp(self):
         self.net_xml_path = '../../../optimization_interface/DCC.net.xml'
         self.start_mode = 'walking'
-        self.ant_num = [350]
+        self.ant_num = [2000]
         self.station_num = [10]
+        self.energy_rate = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 1]
         self.simulation_time = [20000]
-        self.energy_rate = [0.05, 0.07, 0.1, 1]
+
         self.episodes = [500, 1000, 1500, 2000]
         self.iteration = 1
         self.db_path = '../../../optimization_interface/test_new.db'
@@ -32,25 +33,25 @@ class Analysis(unittest.TestCase):
         all_aco_exe_time_costs = []
         all_aco_time_costs = []
 
-        with open('results/ACO-energy.csv', 'w', newline='') as file:
+        with open('results/ACO-energy-1.csv', 'w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(['Experiment ID', 'Number of Ants', 'Simulation Time', 'Station Number', 'Travel Time Cost (seconds)',
+            writer.writerow(['Experiment ID', 'Number of Ants', 'Simulation Time', 'Station Number', 'Initial Energy', 'Travel Time Cost (seconds)',
                              'Execution Time (seconds)', 'Find'])
 
-            for station in self.station_num:
+            for energy in self.energy_rate:
                 for i in range(test_size):
-                    print(station, i)
+                    print(energy, i)
                     source_edge, target_edge = od_pairs[i]
-                    optimizer_interface = Optimization(self.net_xml_path, self.user, self.db_path, self.simulation_time[0], station, source_edge, target_edge)
+                    optimizer_interface = Optimization(self.net_xml_path, self.user, self.db_path, self.simulation_time[0], self.station_num[0], source_edge, target_edge)
                     graph = optimizer_interface.new_graph
                     if graph is None:
-                        writer.writerow([i + 1, self.ant_num[0], self.simulation_time[0], station, 0, 0, False])
+                        writer.writerow([i + 1, self.ant_num[0], self.simulation_time[0], self.station_num[0], energy, 0, 0, False])
                         continue
                     path, time_cost, exe_time = aco.run_aco_algorithm(optimizer_interface, source_edge, target_edge,
-                                                                      self.ant_num[0])
+                                                                      self.ant_num[0], energy)
                     print(time_cost, path)
                     all_aco_time_costs.append(time_cost)
                     all_aco_exe_time_costs.append(exe_time)
                     experiment_id = f"{self.ant_num[0]}-{i + 1}"
-                    writer.writerow([experiment_id, self.ant_num[0], self.simulation_time[0], station, time_cost, exe_time, 'True'])
+                    writer.writerow([experiment_id, self.ant_num[0], self.simulation_time[0], self.station_num[0], energy, time_cost, exe_time, 'True'])
 

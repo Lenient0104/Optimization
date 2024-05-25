@@ -35,7 +35,7 @@ class Environment:
         state = np.array([current_node_index])
         return state
 
-    def step(self, action_index):
+    def step(self, action_index, energy_rate):
         # Fetch all possible actions from the current node, including their mode as a key for lookup
         possible_actions = [(neighbor, key, data) for neighbor in self.graph.neighbors(self.current_node)
                             for key, data in self.graph[self.current_node][neighbor].items()]
@@ -60,7 +60,7 @@ class Environment:
 
         # Check for mode transfer and refill energy if there's a change in mode
         if mode != self.last_mode and self.last_mode is not None:
-            self.remaining_energy = 100  # Refill energy on mode transfer
+            self.remaining_energy = 100 * energy_rate  # Refill energy on mode transfer
 
         # Check if the action is feasible within the energy constraint
         if self.remaining_energy - energy_consumed < 0:
@@ -120,7 +120,7 @@ class DQN(nn.Module):
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.8, gamma=0.95, epsilon=1.0, epsilon_decay=0.99,
+    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.1, gamma=0.95, epsilon=1.0, epsilon_decay=0.99,
                  min_epsilon=0.01, buffer_size=1000000, batch_size=16):
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -237,7 +237,7 @@ class DQNAgent:
 
 
 # after all the training finished
-def infer_best_route(agent, optimizer, env, max_steps=1000):
+def infer_best_route(agent, optimizer, env, energy_rate, max_steps=1000):
     state = env.reset()
     best_route = [env.current_node]
     best_modes = []
@@ -256,12 +256,22 @@ def infer_best_route(agent, optimizer, env, max_steps=1000):
 
         action = agent.act(state, num_available_actions, test=True)
 
-        next_state, reward, done, info = env.step(action)
-        if info['action_taken'] == 'Loop detected':
+        next_state, reward, done, info = env.step(action, energy_rate)
+        if info['action_taken'] == 'Loop detected' or current_node == env.current_node:
+            print('==========')
+            print(info)
+            print('=============')
             return best_route, best_modes, total_time_cost, find
+        # print("================")
+        # print(current_node)
+        # print(env.current_node)
+        # print(optimizer.new_graph[current_node])
+        # print(optimizer.new_graph[current_node][env.current_node])
+        # print("==================")
+
         distance = optimizer.new_graph[current_node][env.current_node][info['mode']]['distance']
         time_cost = optimizer.new_graph[current_node][env.current_node][info['mode']]['weight']
-        print(distance, time_cost)
+        # print(distance, time_cost)
 
         if info['action_taken'][0] == env.destination:
             best_route.append(info['action_taken'][0])
@@ -284,7 +294,7 @@ def infer_best_route(agent, optimizer, env, max_steps=1000):
     return best_route, best_modes, total_time_cost, find
 
 
-def run_dqn(optimizer, source_edge, target_edge, episode_number):
+def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
     all_DQN_exe_times = []
     all_DQN_times = []
     all_successful_tests = []
@@ -321,7 +331,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number):
             num_available_actions = len(possible_actions)
             action = agent.act(state, num_available_actions, test=False)
             _, mode, _ = possible_actions[action]
-            next_state, reward, done, info = env.step(action)
+            next_state, reward, done, info = env.step(action, energy_rate)
             route.append(env.current_node)
             modes.append(mode)
             rewards_count.append(reward)
@@ -349,7 +359,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number):
 
     end_time = time.time()
     execution_time = end_time - start_time
-    best_route, best_modes, total_time_cost, find = infer_best_route(agent, optimizer, env)
+    best_route, best_modes, total_time_cost, find = infer_best_route(agent, optimizer, env, energy_rate)
     total_time_cost = total_time_cost + optimizer.edge_map[target_edge]['length'] / 1.5
 
     if find:

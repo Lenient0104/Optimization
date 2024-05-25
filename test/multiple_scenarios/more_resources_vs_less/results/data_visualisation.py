@@ -50,10 +50,10 @@ def plot_box_plot_travel_time(filtered_data):
     # Plot box plot
     plt.figure(figsize=(12, 8))
     plt.boxplot(all_data, labels=unique_ants)
-    plt.xlabel('Initial Energy')
+    plt.xlabel('Ant Number')
     plt.ylabel('Travel Time Cost (seconds)')
-    plt.title('Q learning Box Plot of Travel Time Cost for Different Initial Energy')
-    plt.savefig('Q learning Learning Box Plot of Travel Time Cost6')
+    plt.title('ACO Box Plot of Travel Time Cost for Different Initial Energy')
+    plt.savefig('ACO Learning Box Plot of Travel Time Cost1')
     plt.show()
 
 
@@ -79,13 +79,13 @@ def plot_box_plot_execution_time(filtered_data):
     plt.boxplot(all_data, labels=unique_ants)
     plt.xlabel('Initial Energy')
     plt.ylabel('Execution Time (seconds)')
-    plt.title('Q learning Box Plot of Execution Time for Different Initial Energy')
+    plt.title('ACO Box Plot of Execution Time for Different Initial Energy')
     plt.autoscale()
-    plt.savefig('Q learning Learning Box Plot of Execution Time6')
+    plt.savefig('ACO Box Plot of Execution Time1')
     plt.show()
 
 
 # Call the functions
-filtered_data = filter_data("test521.csv")
+filtered_data = filter_data("ACO-energy-1.csv")
 plot_box_plot_travel_time(filtered_data)
 plot_box_plot_execution_time(filtered_data)
