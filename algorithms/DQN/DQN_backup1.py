@@ -52,11 +52,11 @@ class Environment:
 
         next_node, mode, edge_data = selected_action
 
-        if next_node == self.current_node or next_node in self.visited_nodes:
-            # print('loop')
-            reward = -100000
-            info = {'current_node': self.current_node, 'mode': mode, 'action_taken': 'Loop detected'}
-            return self._get_state(), reward, True, info
+        # if next_node == self.current_node or next_node in self.visited_nodes:
+        #     # print('loop')
+        #     reward = -100000
+        #     info = {'current_node': self.current_node, 'mode': mode, 'action_taken': 'Loop detected'}
+        #     return self._get_state(), reward, True, info
 
         # Fetch edge data using the current node, next node, and mode
         edge_data = self.graph[self.current_node][next_node][mode]
@@ -91,7 +91,7 @@ class Environment:
         # Check if the destination has been reached
         done = self.current_node == self.destination
 
-        if done and self.steps >= 3:
+        if done and self.steps >= 2:
             reward = 1 / self.total_time_cost
             # print(self.total_time_cost)
         info = {
@@ -135,7 +135,7 @@ class DQN(nn.Module):
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.15, gamma=0.97, epsilon=1.0, epsilon_decay=0.999,
+    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.12, gamma=0.95, epsilon=1.0, epsilon_decay=0.99,
                  min_epsilon=0.01, buffer_size=5000, batch_size=32):
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -177,7 +177,7 @@ class DQNAgent:
                     q_values = self.model(state)
                 q_values_array = q_values.cpu().numpy()[0][:num_actions]
                 action_q_value = q_values_array[action]
-                # print("random q value:", action_q_value)
+                print("random q value:", action_q_value)
             else:
                 state = torch.FloatTensor(state).unsqueeze(0)
                 with torch.no_grad():
@@ -185,7 +185,7 @@ class DQNAgent:
                 q_values_array = q_values.cpu().numpy()[0][:num_actions]
                 action = np.argmax(q_values_array)
                 max_q_value = np.max(q_values_array)
-                # print("max q value:", max_q_value)
+                print("max q value:", max_q_value)
             return action
 
     def replay(self, n_steps=1):
@@ -236,15 +236,15 @@ class DQNAgent:
 
         # Compute Q values for the current states and actions
         current_q_values = self.model(states).gather(1, actions).squeeze(1)
-        # print('current_q_values', current_q_values)
+        print('current_q_values', current_q_values)
 
         # Compute the maximum Q values for the next states
         next_q_values = self.target_model(next_states).max(1)[0]
-        # print('next_q_values', next_q_values)
+        print('next_q_values', next_q_values)
 
         # Compute the expected Q values
         expected_q_values = rewards - (1 - dones) * self.gamma ** n_steps * next_q_values
-        # print('expected_q_values', expected_q_values)
+        print('expected_q_values', expected_q_values)
 
         # Compute loss
         loss = self.loss_fn(current_q_values, expected_q_values.detach())
@@ -356,8 +356,8 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
             action = agent.act(state, num_available_actions, test=False)
             _, mode, _ = possible_actions[action]
             next_state, reward, done, info = env.step(action)
-            # print(reward)
-            # print(info)
+            print(reward)
+            print(info)
             route.append(env.current_node)
             modes.append(mode)
             rewards_count.append(reward)
@@ -372,14 +372,14 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
             state = next_state
             total_reward += reward
             #
-            # if done:
-            # #     print("done")
-            # # # # #     print(modes)
-            # # # # #     print(route)
-            # # # #     print(env.steps)
-            # #     print(env.total_time_cost)
-            # #     print('=========================================================================')
-            #     results.append(env.total_time_cost)
+            if done:
+                print("done")
+            # # #     print(modes)
+            # # #     print(route)
+            # #     print(env.steps)
+                print(env.total_time_cost)
+                print('=========================================================================')
+                results.append(env.total_time_cost)
 
             if len(agent.memory) > 64:
                 agent.replay()
@@ -400,7 +400,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
     all_DQN_exe_times.append(episode_exe_times)
     all_DQN_times.append(episode_times)
 
-    # plt.plot(results)
-    # plt.show()
+    plt.plot(results)
+    plt.show()
 
     return best_route, best_modes, total_time_cost, execution_time, find
