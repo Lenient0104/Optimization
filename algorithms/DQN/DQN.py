@@ -135,7 +135,7 @@ class DQN(nn.Module):
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.15, gamma=0.97, epsilon=1.0, epsilon_decay=0.999,
+    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.23, gamma=0.95, epsilon=1.0, epsilon_decay=0.999,
                  min_epsilon=0.01, buffer_size=5000, batch_size=32):
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -188,7 +188,7 @@ class DQNAgent:
                 # print("max q value:", max_q_value)
             return action
 
-    def replay(self, n_steps=1):
+    def replay(self):
         if len(self.memory) < self.batch_size:
             return
         minibatch = random.sample(self.memory, self.batch_size)
@@ -200,54 +200,31 @@ class DQNAgent:
         dones = []
 
         for state, action, reward, next_state, done in minibatch:
-            total_reward = reward
-            current_next_state = next_state
-            current_done = done
-
-            # Start accumulating future rewards up to n_steps
-            future_steps = min(n_steps, self.batch_size - 1)  # Limit the number of steps to batch size
-            for _ in range(future_steps):
-                if current_done:
-                    break
-                # Get next experience from memory (simulate future steps)
-                future_action = np.random.choice(range(len(self.memory)))  # Randomly select a future action
-                _, _, future_reward, future_next_state, future_done = self.memory[future_action]
-
-                total_reward += (self.gamma ** future_steps) * future_reward
-                current_next_state = future_next_state
-                current_done = future_done
-
             states.append(state)
             actions.append(action)
-            rewards.append(total_reward)
-            next_states.append(current_next_state)
-            dones.append(current_done)
+            rewards.append(reward)
+            next_states.append(next_state)
+            dones.append(done)
 
-        # Convert lists of tuples to NumPy arrays with the correct shape
-        states = np.array(states, dtype=np.float32)  # states are shaped as (batch_size, state_dim)
-        next_states = np.array(next_states, dtype=np.float32)
-
-        # Conversion to tensors
         states = torch.FloatTensor(states)
         next_states = torch.FloatTensor(next_states)
-        actions = torch.LongTensor(actions).view(-1, 1)  # Ensure actions are properly shaped for gather
+        actions = torch.LongTensor(actions).view(-1, 1)
         rewards = torch.FloatTensor(rewards)
         dones = torch.FloatTensor(dones)
 
-        # Compute Q values for the current states and actions
+        # Get current Q values
         current_q_values = self.model(states).gather(1, actions).squeeze(1)
-        # print('current_q_values', current_q_values)
 
-        # Compute the maximum Q values for the next states
-        next_q_values = self.target_model(next_states).max(1)[0]
-        # print('next_q_values', next_q_values)
+        # Compute the next Q values from the target model
+        next_q_values = self.target_model(next_states).max(1)[0].detach()
 
         # Compute the expected Q values
-        expected_q_values = rewards - (1 - dones) * self.gamma ** n_steps * next_q_values
-        # print('expected_q_values', expected_q_values)
+        expected_q_values = rewards + (self.gamma * next_q_values * (1 - dones))
 
-        # Compute loss
-        loss = self.loss_fn(current_q_values, expected_q_values.detach())
+        # Compute the loss
+        loss = self.loss_fn(current_q_values, expected_q_values)
+
+        # Backpropagation
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -334,8 +311,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
     env = Environment(optimizer.new_graph, source_edge, target_edge, energy_rate)
     agent = DQNAgent(state_dim, action_dim)
     start_time = time.time()
-    update_frequency = 10
-    results = []
+    update_frequency = 20
 
     for episode in range(episode_number):
         total_reward = 0
@@ -345,6 +321,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
         done = False
         rewards_count = []
         modes = []
+        results = []
 
         while not done:
             possible_actions = [
@@ -372,14 +349,14 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
             state = next_state
             total_reward += reward
             #
-            # if done:
+            if done:
             # #     print("done")
             # # # # #     print(modes)
             # # # # #     print(route)
             # # # #     print(env.steps)
             # #     print(env.total_time_cost)
             # #     print('=========================================================================')
-            #     results.append(env.total_time_cost)
+                results.append(env.total_time_cost)
 
             if len(agent.memory) > 64:
                 agent.replay()
@@ -399,7 +376,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
 
     all_DQN_exe_times.append(episode_exe_times)
     all_DQN_times.append(episode_times)
-
+    #
     # plt.plot(results)
     # plt.show()
 

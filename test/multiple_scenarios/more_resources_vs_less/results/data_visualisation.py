@@ -50,10 +50,10 @@ def plot_box_plot_travel_time(filtered_data):
     # Plot box plot
     plt.figure(figsize=(12, 8))
     plt.boxplot(all_data, labels=unique_ants)
-    plt.xlabel('Ant Number')
+    plt.xlabel('Initial Energy')
     plt.ylabel('Travel Time Cost (seconds)')
     plt.title('DQN Box Plot of Travel Time Cost for Different Initial Energy')
-    plt.savefig('DQN Learning Box Plot of Travel Time Cost1')
+    plt.savefig('DQN Learning Box Plot of Travel Time Cost2')
     plt.show()
 
 
@@ -81,11 +81,11 @@ def plot_box_plot_execution_time(filtered_data):
     plt.ylabel('Execution Time (seconds)')
     plt.title('DQN Box Plot of Execution Time for Different Initial Energy')
     plt.autoscale()
-    plt.savefig('DQN Box Plot of Execution Time1')
+    plt.savefig('DQN Box Plot of Execution Time2')
     plt.show()
 
 
 # Call the functions
-filtered_data = filter_data("DQN-energy-525.csv")
+filtered_data = filter_data("DQN-energy-526.csv")
 plot_box_plot_travel_time(filtered_data)
 plot_box_plot_execution_time(filtered_data)
