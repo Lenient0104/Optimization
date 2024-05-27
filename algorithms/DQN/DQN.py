@@ -54,7 +54,7 @@ class Environment:
 
         if next_node == self.current_node or next_node in self.visited_nodes:
             # print('loop')
-            reward = -100000
+            reward = -1000000
             info = {'current_node': self.current_node, 'mode': mode, 'action_taken': 'Loop detected'}
             return self._get_state(), reward, True, info
 
@@ -72,7 +72,7 @@ class Environment:
 
         # Check if the action is feasible within the energy constraint
         if self.remaining_energy - energy_consumed < 0:
-            # print("no enough energy")
+            print("no enough energy")
             # Action not feasible due to energy constraint, so don't change mode
             info = {'current_node': self.current_node, 'mode': self.last_mode, 'action_taken': 'Insufficient energy'}
             return self._get_state(), -1000000, True, info  # Now includes info
@@ -135,7 +135,7 @@ class DQN(nn.Module):
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.23, gamma=0.95, epsilon=1.0, epsilon_decay=0.999,
+    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.23, gamma=0.95, epsilon=1.0, epsilon_decay=0.99,
                  min_epsilon=0.01, buffer_size=5000, batch_size=32):
         self.state_dim = state_dim
         self.action_dim = action_dim
