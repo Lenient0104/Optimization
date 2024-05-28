@@ -10,7 +10,7 @@ class TestDQN(unittest.TestCase):
         self.net_xml_path = '../../../optimization_interface/DCC.net.xml'
         self.start_mode = 'walking'
         self.station_num = [10]
-        self.energy_rate = [0.6]
+        self.energy_rate = [0.4, 0.6, 0.7, 0.8]
         self.simulation_time = [20000]
         self.episodes = [1000]
         self.iteration = 1

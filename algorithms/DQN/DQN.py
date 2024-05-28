@@ -72,7 +72,7 @@ class Environment:
 
         # Check if the action is feasible within the energy constraint
         if self.remaining_energy - energy_consumed < 0:
-            print("no enough energy")
+            # print("no enough energy")
             # Action not feasible due to energy constraint, so don't change mode
             info = {'current_node': self.current_node, 'mode': self.last_mode, 'action_taken': 'Insufficient energy'}
             return self._get_state(), -1000000, True, info  # Now includes info
