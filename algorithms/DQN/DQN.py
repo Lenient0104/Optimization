@@ -121,21 +121,21 @@ class DQN(nn.Module):
         super(DQN, self).__init__()
         self.net = nn.Sequential(
             nn.Linear(state_dim, hidden_dim),
-            nn.ReLU(),
+            nn.Tanh(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
+            nn.Tanh(),
             nn.Linear(hidden_dim, action_dim)
         )
         # 初始化最后一层的权重和偏置以使初始Q值为-200
-        self.net[-1].weight.data.fill_(0)  # 将权重初始化为0
-        self.net[-1].bias.data.fill_(0)  # 将偏置初始化为-200
+        self.net[-1].weight.data.fill_(0)
+        self.net[-1].bias.data.fill_(-1000)
 
     def forward(self, x):
         return self.net(x)
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.23, gamma=0.95, epsilon=1.0, epsilon_decay=0.99,
+    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.1, gamma=0.95, epsilon=1.0, epsilon_decay=0.995,
                  min_epsilon=0.01, buffer_size=5000, batch_size=32):
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -161,13 +161,15 @@ class DQNAgent:
         # recording
         self.memory.append((state, action, reward, next_state, done))
 
-    def act(self, state, num_actions, test=False):
+    def act(self, state, num_actions, start, test=False):
         if test:
             state = torch.FloatTensor(state).unsqueeze(0)
             with torch.no_grad():
                 q_values = self.model(state)
             q_values_array = q_values.cpu().numpy()[0][:num_actions]
             action = np.argmax(q_values_array)
+            max_q_value = np.max(q_values_array)
+            print("test max q value:", max_q_value)
             return action
         else:
             if np.random.rand() < self.epsilon:
@@ -185,7 +187,9 @@ class DQNAgent:
                 q_values_array = q_values.cpu().numpy()[0][:num_actions]
                 action = np.argmax(q_values_array)
                 max_q_value = np.max(q_values_array)
-                # print("max q value:", max_q_value)
+
+                if start:
+                    print("training max q value:", max_q_value)
             return action
 
     def replay(self):
@@ -244,6 +248,7 @@ def infer_best_route(agent, optimizer, env, max_steps=1000):
     total_time_cost = 0
     steps = 0
     find = False
+    start = False
 
     while steps < max_steps:
         current_node = env.current_node
@@ -254,7 +259,7 @@ def infer_best_route(agent, optimizer, env, max_steps=1000):
         if num_available_actions == 0:
             break
 
-        action = agent.act(state, num_available_actions, test=True)
+        action = agent.act(state, num_available_actions, start, test=True)
 
         next_state, reward, done, info = env.step(action)
         if info['action_taken'] == 'Loop detected' or current_node == env.current_node:
@@ -312,6 +317,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
     agent = DQNAgent(state_dim, action_dim)
     start_time = time.time()
     update_frequency = 20
+    results = []
 
     for episode in range(episode_number):
         total_reward = 0
@@ -321,7 +327,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
         done = False
         rewards_count = []
         modes = []
-        results = []
+        start = True
 
         while not done:
             possible_actions = [
@@ -330,7 +336,8 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
                 for key, data in env.graph[env.current_node][neighbor].items()
             ]
             num_available_actions = len(possible_actions)
-            action = agent.act(state, num_available_actions, test=False)
+            action = agent.act(state, num_available_actions, start, test=False)
+            start = False
             _, mode, _ = possible_actions[action]
             next_state, reward, done, info = env.step(action)
             # print(reward)
@@ -350,12 +357,12 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
             total_reward += reward
             #
             if done:
-            # #     print("done")
-            # # # # #     print(modes)
-            # # # # #     print(route)
-            # # # #     print(env.steps)
-            # #     print(env.total_time_cost)
-            # #     print('=========================================================================')
+            #      print("done")
+            #      print(modes)
+            #      print(route)
+            #      print(env.steps)
+            #      print(env.total_time_cost)
+            #      print('=========================================================================')
                 results.append(env.total_time_cost)
 
             if len(agent.memory) > 64:
@@ -376,8 +383,8 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
 
     all_DQN_exe_times.append(episode_exe_times)
     all_DQN_times.append(episode_times)
-    #
-    # plt.plot(results)
-    # plt.show()
+
+    plt.plot(results)
+    plt.show()
 
     return best_route, best_modes, total_time_cost, execution_time, find

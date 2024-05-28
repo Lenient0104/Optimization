@@ -10,7 +10,7 @@ class TestDQN(unittest.TestCase):
         self.net_xml_path = '../../../optimization_interface/DCC.net.xml'
         self.start_mode = 'walking'
         self.station_num = [10]
-        self.energy_rate = [0.4, 0.6, 0.7, 0.8]
+        self.energy_rate = [1]
         self.simulation_time = [20000]
         self.episodes = [1000]
         self.iteration = 1
@@ -26,7 +26,7 @@ class TestDQN(unittest.TestCase):
         test_size = len(od_pairs)
         # test_size = 1
 
-        with open('results/527new.csv', 'w', newline='') as file:
+        with open('results/528test.csv', 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(
                 ['Experiment ID', 'Episode', 'Simulation Time', 'Station Number', 'Initial Energy', 'Travel Time Cost (seconds)',
@@ -42,7 +42,7 @@ class TestDQN(unittest.TestCase):
                 episode_times = []
                 successful_tests = 0
 
-                for test_index in range(test_size): # 500 od pairs
+                for test_index in range(1): # 500 od pairs
                     print(energy, test_index)
                     print(od_pairs[test_index])
                     source_edge, target_edge = od_pairs[test_index]
