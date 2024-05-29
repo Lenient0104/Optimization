@@ -57,7 +57,7 @@ class Environment:
 
         if next_node == self.current_node or next_node in self.visited_nodes:
             # print('loop')
-            reward = -1
+            reward = -1000
             self.current_node = next_node
             info = {'current_node': self.current_node, 'mode': mode, 'action_taken': 'Loop detected'}
             return self._get_state(), reward, False, info
@@ -80,7 +80,7 @@ class Environment:
             self.current_node = next_node
             # Action not feasible due to energy constraint, so don't change mode
             info = {'current_node': self.current_node, 'mode': self.last_mode, 'action_taken': 'Insufficient energy'}
-            return self._get_state(), -2, False, info  # Now includes info
+            return self._get_state(), -2000, False, info  # Now includes info
 
         self.last_mode = mode  # Update the last mode used
         # Update energy and current node as the action is feasible
@@ -97,7 +97,7 @@ class Environment:
         done = self.current_node == self.destination
 
         if done and self.steps >= 3:
-            reward = 10000 / self.total_time_cost
+            reward = 1000000 / self.total_time_cost
             # print(self.total_time_cost)
         info = {
             'current_node': self.current_node,
@@ -140,8 +140,8 @@ class DQN(nn.Module):
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.1, gamma=0.95, epsilon=1.0, epsilon_decay=0.99,
-                 min_epsilon=0.01, buffer_size=5000, batch_size=32, n_steps=3):
+    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.1, gamma=0.99, epsilon=1.0, epsilon_decay=0.999,
+                 min_epsilon=0.01, buffer_size=5000, batch_size=64, n_steps=3):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.memory = deque(maxlen=buffer_size)
@@ -189,11 +189,11 @@ class DQNAgent:
             else:
                 print('=========max========')
                 state = torch.FloatTensor(state).unsqueeze(0)
-                print('state:', state)
+                # print('state:', state)
                 with torch.no_grad():
                     q_values = self.model(state)
                 q_values_array = q_values.cpu().numpy()[0][:num_actions]
-                print(q_values_array)
+                # print(q_values_array)
                 action = np.argmax(q_values_array)
                 max_q_value = np.max(q_values_array)
                 # print('max q value', max_q_value)
@@ -205,7 +205,11 @@ class DQNAgent:
     def replay(self):
         if len(self.memory) < self.batch_size:
             return
+        print('replay')
         minibatch = random.sample(self.memory, self.batch_size)
+        # print('==========================')
+        # print(minibatch)
+        # print('==========================')
 
         states = []
         actions = []
@@ -213,7 +217,7 @@ class DQNAgent:
         next_states = []
         dones = []
 
-        for state, action, reward, next_state, done in minibatch:
+        for state, action, reward, next_state, done in self.memory:
             states.append(state)
             actions.append(action)
             rewards.append(reward)
@@ -228,13 +232,19 @@ class DQNAgent:
 
         # Get current Q values
         current_q_values = self.model(states).gather(1, actions).squeeze(1)
-        # print('current_q_values',current_q_values)
+        # print('current states', states)
+        # print('current_q_values', current_q_values)
 
         # Compute the next Q values from the target model
         next_q_values = self.target_model(next_states).max(1)[0].detach()
+        # print('next states', next_states)
+        # print('next q', next_q_values)
 
         # Compute the expected Q values
         expected_q_values = rewards + (self.gamma * next_q_values * (1 - dones))
+        # print('expected q', expected_q_values)
+        # print('rewards', rewards)
+        # print('-=================================================')
 
         # Compute the loss
         loss = self.loss_fn(current_q_values, expected_q_values)
@@ -331,6 +341,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
     results = []
 
     for episode in range(episode_number):
+        print("Episode", episode)
         total_reward = 0
         env.total_time_cost = 0
         state = env.reset()
