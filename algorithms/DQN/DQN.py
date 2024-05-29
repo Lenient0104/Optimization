@@ -49,12 +49,14 @@ class Environment:
 
         # Select the action based on the action_index
         selected_action = possible_actions[action_index]
+        #
+        # print(selected_action)
 
         next_node, mode, edge_data = selected_action
 
         if next_node == self.current_node or next_node in self.visited_nodes:
             # print('loop')
-            reward = -1000000
+            reward = -1
             info = {'current_node': self.current_node, 'mode': mode, 'action_taken': 'Loop detected'}
             return self._get_state(), reward, True, info
 
@@ -75,7 +77,7 @@ class Environment:
             # print("no enough energy")
             # Action not feasible due to energy constraint, so don't change mode
             info = {'current_node': self.current_node, 'mode': self.last_mode, 'action_taken': 'Insufficient energy'}
-            return self._get_state(), -1000000, True, info  # Now includes info
+            return self._get_state(), -1, True, info  # Now includes info
 
         self.last_mode = mode  # Update the last mode used
         # Update energy and current node as the action is feasible
@@ -83,7 +85,7 @@ class Environment:
         self.current_node = next_node
         self.visited_nodes.add(next_node)
         # The reward is now the negative of the time cost divided by distance to consider path length
-        reward = - time_cost
+        reward = 1 / time_cost
         self.steps += 1
 
         self.total_time_cost += time_cost
@@ -92,7 +94,7 @@ class Environment:
         done = self.current_node == self.destination
 
         if done and self.steps >= 3:
-            reward = 1 / self.total_time_cost
+            reward = 1000 / self.total_time_cost
             # print(self.total_time_cost)
         info = {
             'current_node': self.current_node,
@@ -128,7 +130,7 @@ class DQN(nn.Module):
         )
         # 初始化最后一层的权重和偏置以使初始Q值为-200
         self.net[-1].weight.data.fill_(0)
-        self.net[-1].bias.data.fill_(-1000)
+        self.net[-1].bias.data.fill_(0)
 
     def forward(self, x):
         return self.net(x)
@@ -136,12 +138,12 @@ class DQN(nn.Module):
 
 class DQNAgent:
     def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.1, gamma=0.95, epsilon=1.0, epsilon_decay=0.995,
-                 min_epsilon=0.01, buffer_size=5000, batch_size=32):
+                 min_epsilon=0.01, buffer_size=5000, batch_size=32, n_steps=3):
         self.state_dim = state_dim
         self.action_dim = action_dim
-        # Experiences memory
         self.memory = deque(maxlen=buffer_size)
         self.batch_size = batch_size
+        self.n_steps = n_steps  # 这里定义n步前瞻
 
         self.epsilon = epsilon
         self.epsilon_decay = epsilon_decay
@@ -152,7 +154,7 @@ class DQNAgent:
         self.model = DQN(state_dim, action_dim, hidden_dim)
         self.target_model = DQN(state_dim, action_dim, hidden_dim)
         self.target_model.load_state_dict(self.model.state_dict())
-        self.target_model.eval()  # Set target_model to evaluation mode
+        self.target_model.eval()
 
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
         self.loss_fn = nn.MSELoss()
@@ -162,6 +164,7 @@ class DQNAgent:
         self.memory.append((state, action, reward, next_state, done))
 
     def act(self, state, num_actions, start, test=False):
+
         if test:
             state = torch.FloatTensor(state).unsqueeze(0)
             with torch.no_grad():
@@ -219,11 +222,23 @@ class DQNAgent:
         # Get current Q values
         current_q_values = self.model(states).gather(1, actions).squeeze(1)
 
-        # Compute the next Q values from the target model
-        next_q_values = self.target_model(next_states).max(1)[0].detach()
+        # Compute multi-step future Q values from the target model
+        future_q_values = []
+        for idx in range(len(minibatch)):
+            future_reward = 0
+            discount_factor = 1
+            for n in range(self.n_steps):
+                if idx + n < len(minibatch):
+                    future_reward += minibatch[idx + n][2] * discount_factor
+                    discount_factor *= self.gamma
+                    if minibatch[idx + n][4]:  # Check done flag
+                        break
+            future_q_values.append(future_reward)
+
+        future_q_values = torch.FloatTensor(future_q_values)
 
         # Compute the expected Q values
-        expected_q_values = rewards + (self.gamma * next_q_values * (1 - dones))
+        expected_q_values = future_q_values + (self.gamma ** self.n_steps) * self.target_model(next_states).max(1)[0].detach() * (1 - dones)
 
         # Compute the loss
         loss = self.loss_fn(current_q_values, expected_q_values)
