@@ -57,7 +57,7 @@ class Environment:
 
         if next_node == self.current_node or next_node in self.visited_nodes:
             # print('loop')
-            reward = -1000
+            reward = - 1000
             self.current_node = next_node
             info = {'current_node': self.current_node, 'mode': mode, 'action_taken': 'Loop detected'}
             return self._get_state(), reward, False, info
@@ -80,7 +80,7 @@ class Environment:
             self.current_node = next_node
             # Action not feasible due to energy constraint, so don't change mode
             info = {'current_node': self.current_node, 'mode': self.last_mode, 'action_taken': 'Insufficient energy'}
-            return self._get_state(), -2000, False, info  # Now includes info
+            return self._get_state(), -1000, False, info  # Now includes info
 
         self.last_mode = mode  # Update the last mode used
         # Update energy and current node as the action is feasible
@@ -140,8 +140,8 @@ class DQN(nn.Module):
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.1, gamma=0.99, epsilon=1.0, epsilon_decay=0.999,
-                 min_epsilon=0.01, buffer_size=5000, batch_size=64, n_steps=3):
+    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.001, gamma=0.99, epsilon=1.0, epsilon_decay=0.999,
+                 min_epsilon=0.01, buffer_size=5000, batch_size=256, n_steps=3):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.memory = deque(maxlen=buffer_size)
@@ -161,10 +161,11 @@ class DQNAgent:
 
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
         self.loss_fn = nn.MSELoss()
+        self.loss_history = []
 
-    def remember(self, state, action, reward, next_state, done):
+    def remember(self, state, action, reward, next_state, steps, done):
         # recording
-        self.memory.append((state, action, reward, next_state, done))
+        self.memory.append((state, action, reward, next_state, steps, done))
 
     def act(self, state, num_actions, start, test=False):
 
@@ -196,7 +197,7 @@ class DQNAgent:
                 # print(q_values_array)
                 action = np.argmax(q_values_array)
                 max_q_value = np.max(q_values_array)
-                # print('max q value', max_q_value)
+                print('max q value', max_q_value)
 
                 # if start:
                 #     print("training max q value:", max_q_value)
@@ -206,6 +207,7 @@ class DQNAgent:
         if len(self.memory) < self.batch_size:
             return
         print('replay')
+        # self.loss_history = []
         minibatch = random.sample(self.memory, self.batch_size)
         # print('==========================')
         # print(minibatch)
@@ -216,19 +218,22 @@ class DQNAgent:
         rewards = []
         next_states = []
         dones = []
+        steps_all = []
 
-        for state, action, reward, next_state, done in self.memory:
+        for state, action, reward, next_state, steps, done in self.memory:
             states.append(state)
             actions.append(action)
             rewards.append(reward)
             next_states.append(next_state)
             dones.append(done)
+            steps_all.append(steps)
 
         states = torch.FloatTensor(states)
         next_states = torch.FloatTensor(next_states)
         actions = torch.LongTensor(actions).view(-1, 1)
         rewards = torch.FloatTensor(rewards)
         dones = torch.FloatTensor(dones)
+        steps_all = torch.FloatTensor(steps_all)
 
         # Get current Q values
         current_q_values = self.model(states).gather(1, actions).squeeze(1)
@@ -242,12 +247,14 @@ class DQNAgent:
 
         # Compute the expected Q values
         expected_q_values = rewards + (self.gamma * next_q_values * (1 - dones))
-        # print('expected q', expected_q_values)
         # print('rewards', rewards)
+        # print('expected q', expected_q_values)
+
         # print('-=================================================')
 
         # Compute the loss
         loss = self.loss_fn(current_q_values, expected_q_values)
+        self.loss_history.append(loss.item())
 
         # Backpropagation
         self.optimizer.zero_grad()
@@ -320,6 +327,17 @@ def infer_best_route(agent, optimizer, env, max_steps=1000):
     return best_route, best_modes, total_time_cost, find
 
 
+def plot_loss(loss_history):
+    plt.figure(figsize=(10, 5))
+    plt.plot(loss_history, label='Loss over time')
+    plt.xlabel('Iteration')
+    plt.ylabel('Loss')
+    plt.title('Training Loss Over Time')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
 def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
     all_DQN_exe_times = []
     all_DQN_times = []
@@ -341,7 +359,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
     results = []
 
     for episode in range(episode_number):
-        print("Episode", episode)
+        print("-----------------------------------------Episode-------------------------------------", episode)
         total_reward = 0
         env.total_time_cost = 0
         state = env.reset()
@@ -368,13 +386,13 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
             modes.append(mode)
             rewards_count.append(reward)
             # env.total_time_cost -= reward
-            agent.remember(state, action, reward, next_state, done)
+            agent.remember(state, action, reward, next_state, env.steps, done)
             print(state, action, reward, next_state, done)
             total_size = sum(sys.getsizeof(x) for x in (state, action, reward, next_state, done))
 
             # print("Approximate size of the tuple in bytes:", total_size)
 
-            if reward < 0:
+            if reward < 0.000001:
                 break  # Avoid looping in the same state
             state = next_state
             total_reward += reward
@@ -383,11 +401,14 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
                 print(env.total_time_cost)
                 results.append(env.total_time_cost)
 
-            if len(agent.memory) > 64:
-                agent.replay()
+            agent.replay()
 
         if (episode + 1) % update_frequency == 0:
             agent.update_target_model()
+            print('Model updated and loss plotted.')
+        # plot_loss(agent.loss_history)
+        print(agent.loss_history)
+
     memory = agent.memory
     end_time = time.time()
     execution_time = end_time - start_time
