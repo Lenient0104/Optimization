@@ -271,6 +271,7 @@ class DQNAgent:
 # after all the training finished
 def infer_best_route(agent, optimizer, env, max_steps=1000):
     state = env.reset()
+    print(state)
     best_route = [env.current_node]
     best_modes = []
     total_time_cost = 0
@@ -290,6 +291,7 @@ def infer_best_route(agent, optimizer, env, max_steps=1000):
         action = agent.act(state, num_available_actions, start, test=True)
 
         next_state, reward, done, info = env.step(action)
+        print(next_state)
         if info['action_taken'] == 'Loop detected' or current_node == env.current_node:
             print('==========')
             print(info)
@@ -355,7 +357,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
     env = Environment(optimizer.new_graph, source_edge, target_edge, energy_rate)
     agent = DQNAgent(state_dim, action_dim)
     start_time = time.time()
-    update_frequency = 20
+    update_frequency = 5
     results = []
 
     for episode in range(episode_number):
@@ -387,7 +389,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
             rewards_count.append(reward)
             # env.total_time_cost -= reward
             agent.remember(state, action, reward, next_state, env.steps, done)
-            print(state, action, reward, next_state, done)
+            # print(state, action, reward, next_state, done)
             total_size = sum(sys.getsizeof(x) for x in (state, action, reward, next_state, done))
 
             # print("Approximate size of the tuple in bytes:", total_size)
@@ -407,7 +409,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
             agent.update_target_model()
             print('Model updated and loss plotted.')
         # plot_loss(agent.loss_history)
-        print(agent.loss_history)
+        # print(agent.loss_history)
 
     memory = agent.memory
     end_time = time.time()
