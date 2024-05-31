@@ -140,7 +140,7 @@ class DQN(nn.Module):
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.001, gamma=0.8, epsilon=1.0, epsilon_decay=0.99,
+    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.001, gamma=0.8, epsilon=1.0, epsilon_decay=0.999,
                  min_epsilon=0.01, buffer_size=5000, batch_size=256, n_steps=3):
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -180,7 +180,6 @@ class DQNAgent:
             return action
         else:
             if np.random.rand() < self.epsilon:
-                print('=========random========')
                 action = random.randrange(num_actions)
                 state = torch.FloatTensor(state).unsqueeze(0)
                 with torch.no_grad():
@@ -207,64 +206,41 @@ class DQNAgent:
     def replay(self):
         if len(self.memory) < self.batch_size:
             return
-        # print('replay')
-        # self.loss_history = []
+
         minibatch = random.sample(self.memory, self.batch_size)
-        # print('==========================')
-        # print(minibatch)
-        # print('==========================')
+        for sample in minibatch:
+            state, action, reward, next_state, _, done = sample
+            # 在这里处理 n 步逻辑
+            total_return = reward
+            current_state = state
+            current_action = action
+            gamma_pow = 1
+            transition_idx = list(self.memory).index(sample)
 
-        states = []
-        actions = []
-        rewards = []
-        next_states = []
-        dones = []
-        steps_all = []
+            # 检查连续性并计算累计奖励
+            for _ in range(1, self.n_steps):
+                if transition_idx + 1 < len(self.memory):
+                    next_sample = self.memory[transition_idx + 1]
+                    if not next_sample[4]:  # 如果没有结束
+                        gamma_pow *= self.gamma
+                        total_return += gamma_pow * next_sample[2]
+                        next_state = next_sample[3]
+                        transition_idx += 1
+                    else:
+                        break
 
-        for state, action, reward, next_state, steps, done in self.memory:
-            states.append(state)
-            actions.append(action)
-            rewards.append(reward)
-            next_states.append(next_state)
-            dones.append(done)
-            steps_all.append(steps)
+            if not done:
+                total_return += (self.gamma ** self.n_steps) * np.max(
+                    self.model(torch.FloatTensor(next_state)).detach().numpy())
 
-        states = torch.FloatTensor(states)
-        next_states = torch.FloatTensor(next_states)
-        actions = torch.LongTensor(actions).view(-1, 1)
-        rewards = torch.FloatTensor(rewards)
-        dones = torch.FloatTensor(dones)
-        steps_all = torch.FloatTensor(steps_all)
+            current_q_value = self.model(torch.FloatTensor(current_state))[current_action]
+            loss = self.loss_fn(current_q_value, torch.tensor(total_return).float())
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
 
-        # Get current Q values
-        current_q_values = self.model(states).gather(1, actions).squeeze(1)
-        # print('current states', states)
-        # print('current_q_values', current_q_values)
-
-        # Compute the next Q values from the target model
-        next_q_values = self.target_model(next_states).max(1)[0].detach()
-        # print('next states', next_states)
-        # print('next q', next_q_values)
-
-        # Compute the expected Q values
-        expected_q_values = rewards + (self.gamma * next_q_values * (1 - dones))
-        # print('rewards', rewards)
-        # print('expected q', expected_q_values)
-        #
-        # comparison = current_q_values > expected_q_values
-        # print('Comparison results:', comparison)
-
-        # Compute the loss
-        loss = self.loss_fn(current_q_values, expected_q_values)
-        self.loss_history.append(loss.item())
-
-        # Backpropagation
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-
-        # Update epsilon
-        self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
+            # 更新 epsilon
+            self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
     def update_target_model(self):
         self.target_model.load_state_dict(self.model.state_dict())
@@ -359,7 +335,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
     env = Environment(optimizer.new_graph, source_edge, target_edge, energy_rate)
     agent = DQNAgent(state_dim, action_dim)
     start_time = time.time()
-    update_frequency = 5
+    update_frequency = 100
     results = []
 
     for episode in range(episode_number):
