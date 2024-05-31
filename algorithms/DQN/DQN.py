@@ -96,7 +96,7 @@ class Environment:
         # Check if the destination has been reached
         done = self.current_node == self.destination
 
-        if done and self.steps >= 3:
+        if done:
             reward = 1000000 / self.total_time_cost
             # print(self.total_time_cost)
         info = {
@@ -140,7 +140,7 @@ class DQN(nn.Module):
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.001, gamma=0.8, epsilon=1.0, epsilon_decay=0.9999,
+    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.001, gamma=0.9, epsilon=1.0, epsilon_decay=0.999,
                  min_epsilon=0.01, buffer_size=5000, batch_size=256, n_steps=3):
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -203,51 +203,54 @@ class DQNAgent:
                 #     print("training max q value:", max_q_value)
             return action
 
-    def replay(self, n_steps=3):
+    def replay(self):
         if len(self.memory) < self.batch_size:
             return
-
+        # print('replay')
+        # self.loss_history = []
         minibatch = random.sample(self.memory, self.batch_size)
-        states = torch.FloatTensor([x[0] for x in minibatch])
-        actions = torch.LongTensor([x[1] for x in minibatch]).view(-1, 1)
-        rewards = torch.FloatTensor([x[2] for x in minibatch])
-        next_states = torch.FloatTensor([x[3] for x in minibatch])
-        dones = torch.FloatTensor([x[4] for x in minibatch])
+        # print('==========================')
+        # print(minibatch)
+        # print('==========================')
 
-        # We need to calculate n-step rewards and the corresponding next states
-        n_step_rewards = torch.zeros(self.batch_size, dtype=torch.float32)
-        n_step_next_states = [x[3] for x in minibatch]
-        n_step_dones = torch.zeros(self.batch_size, dtype=torch.float32)
+        states = []
+        actions = []
+        rewards = []
+        next_states = []
+        dones = []
+        steps_all = []
 
-        for idx, (state, action, reward, next_state, done) in enumerate(minibatch):
-            current_reward = reward
-            current_gamma = self.gamma
-            next_state_index = idx
-            for _ in range(n_steps - 1):
-                if not done:
-                    next_state_index = (next_state_index + 1) % len(minibatch)
-                    next_reward = minibatch[next_state_index][2]
-                    done = minibatch[next_state_index][4]
-                    current_reward += current_gamma * next_reward
-                    current_gamma *= self.gamma
-                    if done:
-                        break
-            n_step_rewards[idx] = current_reward
-            n_step_next_states[idx] = minibatch[next_state_index][3]
-            n_step_dones[idx] = done
+        for state, action, reward, next_state, done in minibatch:
+            states.append(state)
+            actions.append(action)
+            rewards.append(reward)
+            next_states.append(next_state)
+            dones.append(done)
+            # steps_all.append(steps)
 
-        n_step_next_states = torch.FloatTensor(n_step_next_states)
-        n_step_rewards = torch.FloatTensor(n_step_rewards)
-        n_step_dones = torch.FloatTensor(n_step_dones)
+        states = torch.FloatTensor(states)
+        next_states = torch.FloatTensor(next_states)
+        actions = torch.LongTensor(actions).view(-1, 1)
+        rewards = torch.FloatTensor(rewards)
+        dones = torch.FloatTensor(dones)
+        # steps_all = torch.FloatTensor(steps_all)
 
         # Get current Q values
         current_q_values = self.model(states).gather(1, actions).squeeze(1)
+        # print('current states', states)
+        # print('current_q_values', current_q_values)
 
-        # Compute the n-step next Q values from the target model for the next states
-        next_q_values = self.target_model(n_step_next_states).max(1)[0].detach()
+        # Compute the next Q values from the target model
+        next_q_values = self.target_model(next_states).max(1)[0].detach()
+        # print('next states', next_states)
+        # print('next q', next_q_values)
 
         # Compute the expected Q values
-        expected_q_values = n_step_rewards + (self.gamma ** n_steps * next_q_values * (1 - n_step_dones))
+        expected_q_values = rewards + (self.gamma * next_q_values * (1 - dones))
+        # print('rewards', rewards)
+        # print('expected q', expected_q_values)
+
+        # print('-=================================================')
 
         # Compute the loss
         loss = self.loss_fn(current_q_values, expected_q_values)
@@ -354,7 +357,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
     env = Environment(optimizer.new_graph, source_edge, target_edge, energy_rate)
     agent = DQNAgent(state_dim, action_dim)
     start_time = time.time()
-    update_frequency = 100
+    update_frequency = 10
     results = []
 
     for episode in range(episode_number):
