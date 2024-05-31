@@ -140,7 +140,7 @@ class DQN(nn.Module):
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.001, gamma=0.99, epsilon=1.0, epsilon_decay=0.999,
+    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.001, gamma=0.8, epsilon=1.0, epsilon_decay=0.999,
                  min_epsilon=0.01, buffer_size=5000, batch_size=256, n_steps=3):
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -206,7 +206,7 @@ class DQNAgent:
     def replay(self):
         if len(self.memory) < self.batch_size:
             return
-        print('replay')
+        # print('replay')
         # self.loss_history = []
         minibatch = random.sample(self.memory, self.batch_size)
         # print('==========================')
@@ -389,7 +389,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
             rewards_count.append(reward)
             # env.total_time_cost -= reward
             agent.remember(state, action, reward, next_state, env.steps, done)
-            # print(state, action, reward, next_state, done)
+            print(state, action, reward, next_state, done)
             total_size = sum(sys.getsizeof(x) for x in (state, action, reward, next_state, done))
 
             # print("Approximate size of the tuple in bytes:", total_size)
