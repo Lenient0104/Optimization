@@ -180,6 +180,7 @@ class DQNAgent:
             return action
         else:
             if np.random.rand() < self.epsilon:
+                print('=========random========')
                 action = random.randrange(num_actions)
                 state = torch.FloatTensor(state).unsqueeze(0)
                 with torch.no_grad():
@@ -249,8 +250,9 @@ class DQNAgent:
         expected_q_values = rewards + (self.gamma * next_q_values * (1 - dones))
         # print('rewards', rewards)
         # print('expected q', expected_q_values)
-
-        # print('-=================================================')
+        #
+        # comparison = current_q_values > expected_q_values
+        # print('Comparison results:', comparison)
 
         # Compute the loss
         loss = self.loss_fn(current_q_values, expected_q_values)

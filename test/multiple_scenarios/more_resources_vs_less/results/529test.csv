@@ -1,2 +1,2 @@
 Experiment ID,Episode,Simulation Time,Station Number,Initial Energy,Travel Time Cost (seconds),Execution Time (seconds),Find
-10000-0,10000,20000,10,1,3576.6382943393764,1093.7456188201904,True
+1000-0,1000,20000,10,1,3676.892353743058,48.84106206893921,True
