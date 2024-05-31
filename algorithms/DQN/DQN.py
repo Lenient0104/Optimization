@@ -140,7 +140,7 @@ class DQN(nn.Module):
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.001, gamma=0.8, epsilon=1.0, epsilon_decay=0.999,
+    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.001, gamma=0.8, epsilon=1.0, epsilon_decay=0.99,
                  min_epsilon=0.01, buffer_size=5000, batch_size=256, n_steps=3):
         self.state_dim = state_dim
         self.action_dim = action_dim
