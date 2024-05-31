@@ -140,7 +140,7 @@ class DQN(nn.Module):
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.001, gamma=0.8, epsilon=1.0, epsilon_decay=0.999,
+    def __init__(self, state_dim, action_dim, hidden_dim=512, lr=0.001, gamma=0.8, epsilon=1.0, epsilon_decay=0.9999,
                  min_epsilon=0.01, buffer_size=5000, batch_size=256, n_steps=3):
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -163,9 +163,9 @@ class DQNAgent:
         self.loss_fn = nn.MSELoss()
         self.loss_history = []
 
-    def remember(self, state, action, reward, next_state, steps, done):
+    def remember(self, state, action, reward, next_state, done):
         # recording
-        self.memory.append((state, action, reward, next_state, steps, done))
+        self.memory.append((state, action, reward, next_state, done))
 
     def act(self, state, num_actions, start, test=False):
 
@@ -203,44 +203,63 @@ class DQNAgent:
                 #     print("training max q value:", max_q_value)
             return action
 
-    def replay(self):
+    def replay(self, n_steps=3):
         if len(self.memory) < self.batch_size:
             return
 
         minibatch = random.sample(self.memory, self.batch_size)
-        for sample in minibatch:
-            state, action, reward, next_state, _, done = sample
-            # 在这里处理 n 步逻辑
-            total_return = reward
-            current_state = state
-            current_action = action
-            gamma_pow = 1
-            transition_idx = list(self.memory).index(sample)
+        states = torch.FloatTensor([x[0] for x in minibatch])
+        actions = torch.LongTensor([x[1] for x in minibatch]).view(-1, 1)
+        rewards = torch.FloatTensor([x[2] for x in minibatch])
+        next_states = torch.FloatTensor([x[3] for x in minibatch])
+        dones = torch.FloatTensor([x[4] for x in minibatch])
 
-            # 检查连续性并计算累计奖励
-            for _ in range(1, self.n_steps):
-                if transition_idx + 1 < len(self.memory):
-                    next_sample = self.memory[transition_idx + 1]
-                    if not next_sample[4]:  # 如果没有结束
-                        gamma_pow *= self.gamma
-                        total_return += gamma_pow * next_sample[2]
-                        next_state = next_sample[3]
-                        transition_idx += 1
-                    else:
+        # We need to calculate n-step rewards and the corresponding next states
+        n_step_rewards = torch.zeros(self.batch_size, dtype=torch.float32)
+        n_step_next_states = [x[3] for x in minibatch]
+        n_step_dones = torch.zeros(self.batch_size, dtype=torch.float32)
+
+        for idx, (state, action, reward, next_state, done) in enumerate(minibatch):
+            current_reward = reward
+            current_gamma = self.gamma
+            next_state_index = idx
+            for _ in range(n_steps - 1):
+                if not done:
+                    next_state_index = (next_state_index + 1) % len(minibatch)
+                    next_reward = minibatch[next_state_index][2]
+                    done = minibatch[next_state_index][4]
+                    current_reward += current_gamma * next_reward
+                    current_gamma *= self.gamma
+                    if done:
                         break
+            n_step_rewards[idx] = current_reward
+            n_step_next_states[idx] = minibatch[next_state_index][3]
+            n_step_dones[idx] = done
 
-            if not done:
-                total_return += (self.gamma ** self.n_steps) * np.max(
-                    self.model(torch.FloatTensor(next_state)).detach().numpy())
+        n_step_next_states = torch.FloatTensor(n_step_next_states)
+        n_step_rewards = torch.FloatTensor(n_step_rewards)
+        n_step_dones = torch.FloatTensor(n_step_dones)
 
-            current_q_value = self.model(torch.FloatTensor(current_state))[current_action]
-            loss = self.loss_fn(current_q_value, torch.tensor(total_return).float())
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+        # Get current Q values
+        current_q_values = self.model(states).gather(1, actions).squeeze(1)
 
-            # 更新 epsilon
-            self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
+        # Compute the n-step next Q values from the target model for the next states
+        next_q_values = self.target_model(n_step_next_states).max(1)[0].detach()
+
+        # Compute the expected Q values
+        expected_q_values = n_step_rewards + (self.gamma ** n_steps * next_q_values * (1 - n_step_dones))
+
+        # Compute the loss
+        loss = self.loss_fn(current_q_values, expected_q_values)
+        self.loss_history.append(loss.item())
+
+        # Backpropagation
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        # Update epsilon
+        self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
     def update_target_model(self):
         self.target_model.load_state_dict(self.model.state_dict())
@@ -366,7 +385,7 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
             modes.append(mode)
             rewards_count.append(reward)
             # env.total_time_cost -= reward
-            agent.remember(state, action, reward, next_state, env.steps, done)
+            agent.remember(state, action, reward, next_state, done)
             print(state, action, reward, next_state, done)
             total_size = sum(sys.getsizeof(x) for x in (state, action, reward, next_state, done))
 
