@@ -83,6 +83,13 @@ class Optimization:
 
         return edge_detail_map
 
+    def select_random_tools(self, seed=None):
+        e_mobility_tools = ['e_car', 'e_scooter_1', 'e_bike_1']
+        if seed is not None:
+            random.seed(seed)
+        num_items_to_select = random.randint(1, 3)
+        return random.sample(e_mobility_tools, num_items_to_select)
+
     def get_stations(self, user, station_num):
         # Ensure all edges initially have just a 'walking' station
         edge_stations = {edge_id: ['walking'] for edge_id in self.unique_edges}
@@ -97,18 +104,26 @@ class Optimization:
                               '67138626#1',
                               '41502636#0', '-75450412', '-23347664#1', '14151839#3', '-12341242#1', '-13904652',
                               '-47638297#3']
+        #
+        e_tools_distribution = []
+        seed = 42
+        for i in range(station_num):
+            e_tools = self.select_random_tools(seed+i)
+            e_tools_distribution.append(e_tools)
+        #
 
-        e_mobility_stations = user.preference
-        if not user.driving_license and 'e_car' in user.preference:
-            e_mobility_stations.remove('e_car')
-        if station_num == 10:
+    # if not self.user.driving_license and 'e_car' in user.preference:
+    #         e_mobility_stations.remove('e_car')
+
+        if station_num == 20:
+            i = 0
             for edge_id in edge_to_assign_new:
-                edge_stations[edge_id] = ['walking'] + e_mobility_stations
-        else:
-            random.seed(66)
-            edge_to_assign = random.sample(edge_to_assign_new, station_num)
-            for edge_id in edge_to_assign:
-                edge_stations[edge_id] = ['walking'] + e_mobility_stations
+                edge_stations[edge_id] = ['walking'] + e_tools_distribution[i]
+                i += 1
+        # else:
+        # e_mobility_tools = ['e_car', 'e_scooter_1', 'e_bike_1']
+        # for edge_id in edge_to_assign_new:
+        #     edge_stations[edge_id] = ['walking'] + e_mobility_tools
         return edge_stations
 
     def check_edge_existence(self, edge):
