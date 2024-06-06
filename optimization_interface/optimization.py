@@ -105,25 +105,26 @@ class Optimization:
                               '41502636#0', '-75450412', '-23347664#1', '14151839#3', '-12341242#1', '-13904652',
                               '-47638297#3']
         #
-        e_tools_distribution = []
-        seed = 42
-        for i in range(station_num):
-            e_tools = self.select_random_tools(seed+i)
-            e_tools_distribution.append(e_tools)
+        # e_tools_distribution = []
+        # seed = 42
+        # for i in range(station_num):
+        #     e_tools = self.select_random_tools(seed+i)
+        #     e_tools_distribution.append(e_tools)
+        # #
         #
-
-    # if not self.user.driving_license and 'e_car' in user.preference:
-    #         e_mobility_stations.remove('e_car')
-
-        if station_num == 20:
-            i = 0
-            for edge_id in edge_to_assign_new:
-                edge_stations[edge_id] = ['walking'] + e_tools_distribution[i]
-                i += 1
+        #
+        #
+        # if station_num == 20:
+        #     i = 0
+        #     for edge_id in edge_to_assign_new:
+        #         edge_stations[edge_id] = ['walking'] + e_tools_distribution[i]
+        #         i += 1
         # else:
-        # e_mobility_tools = ['e_car', 'e_scooter_1', 'e_bike_1']
-        # for edge_id in edge_to_assign_new:
-        #     edge_stations[edge_id] = ['walking'] + e_mobility_tools
+        e_mobility_tools = ['e_car', 'e_scooter_1', 'e_bike_1']
+        # if not self.user.driving_license and 'e_car' in user.preference:
+        #         e_mobility_stations.remove('e_car')
+        for edge_id in edge_to_assign_new:
+            edge_stations[edge_id] = ['walking'] + self.user.preference
         return edge_stations
 
     def check_edge_existence(self, edge):
