@@ -26,7 +26,7 @@ class TestDQN(unittest.TestCase):
         test_size = len(od_pairs)
         # test_size = 1
 
-        with open('results/529test.csv', 'w', newline='') as file:
+        with open('results/0604test.csv', 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(
                 ['Experiment ID', 'Episode', 'Simulation Time', 'Station Number', 'Initial Energy', 'Travel Time Cost (seconds)',

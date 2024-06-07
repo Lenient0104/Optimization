@@ -1,14 +1,24 @@
 import pandas as pd
 
-# 读取CSV文件
-df = pd.read_csv('input.csv')
+# Load the CSV file
+file_path = 'ACO-fixed-tools.csv'
+data = pd.read_csv(file_path)
 
-# 确保新列与现有数据行数对齐
-num_rows_to_add = len(df)
-new_column_data = ['value1', 'value2', 'value3'] + [pd.NA] * (num_rows_to_add - len(new_column_data))
+# Add a new column 'E-tools' with all values set to 'Fixed'
+data['User Preference'] = 'Prefer No E-car Option'
 
-# 添加新列
-df['New Column'] = new_column_data
+# Save the updated dataframe to a new CSV file
+new_file_path = 'Updated_ACO.csv'
+data.to_csv(new_file_path, index=False)
 
-# 将DataFrame写回CSV文件
-df.to_csv('output.csv', index=False)
+
+# Load the CSV file
+file_path = 'ACO-noecar.csv'
+data = pd.read_csv(file_path)
+
+# Add a new column 'E-tools' with all values set to 'Fixed'
+data['User Preference'] = 'No Preference'
+
+# Save the updated dataframe to a new CSV file
+new_file_path = 'Updated_ACO_1.csv'
+data.to_csv(new_file_path, index=False)
