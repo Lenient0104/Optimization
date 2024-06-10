@@ -1,59 +1,62 @@
-import heapq
+import json
+import random
 import re
 import sqlite3
 import time
-import random
-
-import matplotlib
-import networkx as nx
-
-from aco import Ant
 import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
+import networkx as nx
+from aco import Ant
+
 from tqdm import tqdm
-from e_car import ECar_EnergyConsumptionModel
-from e_bike import Ebike_PowerConsumptionCalculator
-from e_scooter import Escooter_PowerConsumptionCalculator
-
-
-# matplotlib.use('TkAgg')  # Use Tkinter backend
+# from big_table_interface import queryTest
+# from .energy_models.e_bike import Ebike_PowerConsumptionCalculator
+# from .energy_models.e_car import ECar_EnergyConsumptionModel
+# from .energy_models.e_scooter import Escooter_PowerConsumptionCalculator
 
 
 class Optimization:
-    def __init__(self, net_xml_path, user, db_path, start_edge, destinatiin_edge):
+    def __init__(self, net_xml_path, user, db_path, simulation, station_num, start_edge, destination_edge):
         self.mode_stations = None
         self.new_graph = None
         self.user = user
+        self.simulation = simulation
+        self.station_num = station_num
         self.unique_edges = []
         self.connections = []
         self.net_xml_path = net_xml_path
         self.db_connection = sqlite3.connect(db_path)
 
         # Parse the XML file to get road and lane information
-        self.edges, self.edge_map = self.parse_net_xml(net_xml_path)
+        self.edge_map = self.parse_net_xml(net_xml_path)
         # Map time to lanes using the provided CSV file
-        self.edges_station = self.get_stations(self.user)
-        self.map_speed()
-        self.mode_time_cal()
+        self.edges_station = self.get_stations(self.user, station_num)
+
         # Insert energy model
-        self.ecar_energymodel = ECar_EnergyConsumptionModel(4)
-        self.ebike_energymodel = Ebike_PowerConsumptionCalculator()
-        self.escooter_energymodel = Escooter_PowerConsumptionCalculator()
+        # self.ecar_energymodel = ECar_EnergyConsumptionModel(4)
+        # self.ebike_energymodel = Ebike_PowerConsumptionCalculator()
+        # self.escooter_energymodel = Escooter_PowerConsumptionCalculator()
         # self.map_energy_to_lanes(60, 1)
         # self.map_station_availability()
 
-        self.initialize_pheromone_levels()
         self.G = self.build_graph()
-        self.new_graph = self.build_new_graph(start_edge, destinatiin_edge)
+        self.new_graph = self.build_new_graph(start_edge, destination_edge)
+
+    def choose_od_pairs(self):
+        random.seed(88)
+        random_pairs = []
+        for _ in range(500):
+            pair = random.sample(self.unique_edges, 2)
+            random_pairs.append(pair)
+        return random_pairs
 
     def parse_net_xml(self, filepath):
         pattern = r"^[A-Za-z]+"
         tree = ET.parse(filepath)
         root = tree.getroot()
-        edges = {}
         # Creating a map for edge details from <edge> tags
         edge_detail_map = {}
-        start_time = time.time()
+
         for edge in tqdm(root.findall('edge'), desc="Processing edges"):
             for lane in edge.findall('lane'):
                 edge_id = edge.attrib['id']
@@ -62,10 +65,7 @@ class Optimization:
                     'speed_limit': float(lane.attrib['speed']),
                     'shape': lane.attrib['shape'],
                 }
-        end_time = time.time()  # End timing
-        print(f"Finished information extraction from edges in {end_time - start_time:.2f} seconds.")
 
-        start_time = time.time()
         # Constructing edges from <connection> tags
         for conn in tqdm(root.findall('connection'), desc="Processing connections", mininterval=1.0):
             pairs = []
@@ -83,105 +83,47 @@ class Optimization:
             pairs.append(to_edge)
             self.connections.append(pairs)
 
-            # Using details from <edge> if available, else setting defaults
-            details_from = edge_detail_map.get(from_edge, {'length': 0, 'speed_limit': 0})
-            details_to = edge_detail_map.get(to_edge, {'length': 0, 'speed_limit': 0})
+        return edge_detail_map
 
-            # edges data structure
-            edges[connection_id] = {
-                'from_edge': from_edge,
-                'to_edge': to_edge,
-                'from_length': details_from['length'],
-                'to_length': details_to['length'],
-                'length': details_from['length'] + details_to['length'],
-                'speed_limit': 13.9,
-                'mode_time': {
-                    'e_bike_1': {'from_time': 0, 'to_time': 0},
-                    'e_car': {'from_time': 0, 'to_time': 0},
-                    'e_scooter_1': {'from_time': 0, 'to_time': 0},
-                    'walking': {'from_time': 0, 'to_time': 0}
-                },
-                'speed': {
-                    'e_bike_1': {'from_speed': 0.0, 'to_speed': 0.0},
-                    'e_car': {'from_speed': 0.0, 'to_speed': 0.0},
-                    'e_scooter_1': {'from_speed': 0.0, 'to_speed': 0.0},
-                    'walking': {'speed': 1.4}
-                },
-                'from_average_speed': 0,
-                'to_average_speed': 0,
-                'energy_consumption': {
-                    'e_bike_1': {'from_energy': 0, 'to_energy': 0},
-                    'e_car': {'from_energy': 0, 'to_energy': 0},
-                    'e_scooter_1': {'from_energy': 0, 'to_energy': 0}
-                },
-                'pheromone_levels': {
-                    'e_bike_1': {'from': 0.1, 'to': 0.1},
-                    'e_car': {'from': 0.1, 'to': 0.1},
-                    'e_scooter_1': {'from': 0.1, 'to': 0.1},
-                    'walking': {'from': 0.1, 'to': 0.1}
-                }
-            }
+    def select_random_tools(self, seed=None):
+        e_mobility_tools = ['e_car', 'e_scooter_1', 'e_bike_1']
+        if seed is not None:
+            random.seed(seed)
+        num_items_to_select = random.randint(1, 3)
+        return random.sample(e_mobility_tools, num_items_to_select)
 
-        end_time = time.time()  # End timing for the connections
-        print(f"Finished constructing connections in {end_time - start_time:.2f} seconds.")
-        return edges, edge_detail_map
-
-    def map_speed(self):
-        for _, edge_data in tqdm(self.edges.items(), desc="Setting Speed Data"):
-            edge_data['speed']['e_bike_1']['from_speed'] = 5.6
-            edge_data['speed']['e_bike_1']['to_speed'] = 5.6
-            edge_data['speed']['e_scooter_1']['from_speed'] = 5.6
-            edge_data['speed']['e_scooter_1']['to_speed'] = 5.6
-            edge_data['speed']['e_car']['from_speed'] = 33.3
-            edge_data['speed']['e_car']['to_speed'] = 33.3
-
-    def mode_time_cal(self):
-        for _, edge_data in tqdm(self.edges.items(), desc="Setting Time Data"):
-            edge_data['mode_time']['e_bike_1']['from_time'] = edge_data['from_length'] / edge_data['speed']['e_bike_1'][
-                'from_speed']
-            edge_data['mode_time']['e_bike_1']['to_time'] = edge_data['to_length'] / edge_data['speed']['e_bike_1'][
-                'to_speed']
-            edge_data['mode_time']['e_scooter_1']['from_time'] = edge_data['from_length'] / \
-                                                                 edge_data['speed']['e_scooter_1'][
-                                                                     'from_speed']
-            edge_data['mode_time']['e_scooter_1']['to_time'] = edge_data['to_length'] / \
-                                                               edge_data['speed']['e_scooter_1'][
-                                                                   'to_speed']
-            edge_data['mode_time']['e_car']['from_time'] = edge_data['from_length'] / edge_data['speed']['e_car'][
-                'from_speed']
-            edge_data['mode_time']['e_car']['to_time'] = edge_data['to_length'] / edge_data['speed']['e_car'][
-                'to_speed']
-            edge_data['mode_time']['walking']['from_time'] = edge_data['from_length'] / edge_data['speed']['walking'][
-                'speed']
-            edge_data['mode_time']['walking']['to_time'] = edge_data['to_length'] / edge_data['speed']['walking'][
-                'speed']
-
-    def get_stations(self, user):
+    def get_stations(self, user, station_num):
         # Ensure all edges initially have just a 'walking' station
         edge_stations = {edge_id: ['walking'] for edge_id in self.unique_edges}
 
         edge_to_assign = ['361409608#3', '3791905#2', '-11685016#2', '369154722#2', '244844370#0', '37721356#0',
                           '74233405#1', '129774671#0', '23395388#5', '-64270141']
-        # indices_to_assign = [50, 89, 112, 256, 309, 4000, 503, 8000, 30000, 10000]
-        e_mobility_stations = user.preference
-        if not user.driving_license and 'e_car' in user.preference:
-            e_mobility_stations.remove('e_car')
-        for edge_id in edge_to_assign:
-            edge_stations[edge_id] = ['walking'] + e_mobility_stations
-        return edge_stations
+        edge_to_assign_test = ['4395595#0', '-7989929#1', '-3238213', '-4253696#0', '4395609#0', '3785445#0', '-14047194#2',
+                               '-64265660#1', '7990024#0', '556290239#0', '-23076566', '14678903']
 
-    # need changing
-    def initialize_pheromone_levels(self):
-        for connection_id in self.edges:
-            # Initialize pheromone levels for each transportation mode
-            pheromone_init_value = 0.1
-            self.edges[connection_id]['pheromone_levels'] = {
-                'e_bike_1': {'from': pheromone_init_value, 'to': pheromone_init_value},
-                'e_car': {'from': pheromone_init_value, 'to': pheromone_init_value},
-                'e_scooter_1': {'from': pheromone_init_value, 'to': pheromone_init_value},
-                'walking': {'from': pheromone_init_value, 'to': pheromone_init_value}
-            }
-        # print(self.convert(self.edges)['-1'])
+        edge_to_assign_new = ['361409608#3', '3791905#2', '-11685016#2', '369154722#2', '244844370#0', '37721356#0',
+                              '74233405#1', '129774671#0', '23395388#5', '-64270141', '18927706#0', '-42471880',
+                              '67138626#1',
+                              '41502636#0', '-75450412', '-23347664#1', '14151839#3', '-12341242#1', '-13904652',
+                              '-47638297#3']
+        #
+        # e_tools_distribution = []
+        # seed = 42
+        # for i in range(station_num):
+        #     e_tools = self.select_random_tools(seed+i)
+        #     e_tools_distribution.append(e_tools)
+        # if station_num == 20:
+        #     i = 0
+        #     for edge_id in edge_to_assign_new:
+        #         edge_stations[edge_id] = ['walking'] + e_tools_distribution[i]
+        #         i += 1
+        # else:
+        e_mobility_tools = ['e_car', 'e_scooter_1', 'e_bike_1']
+        # if not self.user.driving_license and 'e_car' in user.preference:
+        #         e_mobility_stations.remove('e_car')
+        for edge_id in edge_to_assign_new:
+            edge_stations[edge_id] = ['walking'] + self.user.preference
+        return edge_stations
 
     def check_edge_existence(self, edge):
         if edge in self.unique_edges:
@@ -238,7 +180,7 @@ class Optimization:
                                                                 0)  # Get current level, default to 0 if not set
                         # Update pheromone level
                         updated_pheromone_level = current_pheromone_level + self.pheromone_deposit_function(
-                            ant.total_time_cost)
+                            ant.total_time_cost) * 100000000
                         # Set the updated pheromone level back on the edge
                         self.new_graph[edge_1][edge_2][key]['pheromone_level'] = updated_pheromone_level
 
@@ -249,22 +191,44 @@ class Optimization:
         # Higher deposit for faster paths
         return 1 / path_cost  # Example function, adjust as needed
 
+    def get_simulation_data(self):
+        # queryTest.query_speed_at_time(self.simulation)
+        filename = "query_results-" + str(self.simulation) + ".json"
+        file_path = filename
+        with open(file_path) as f:
+            data = json.load(f)
+        data_dict = {entry['edge_id']: entry for entry in data}
+        return data_dict
+
     def build_graph(self):
         G = nx.DiGraph()
         edges = self.unique_edges
 
+        # Add nodes to the graph
         for edge in edges:
             G.add_node(edge, length=self.edge_map[edge]['length'])
 
+        speed_data = self.get_simulation_data()
+
         for connection in self.connections:
+            entry = speed_data[connection[0]]
             length = self.edge_map[connection[0]]['length']
-            G.add_edge(connection[0], connection[1], travel_times={
-                'e_bike_1': length / 9.72,
-                'e_car': length / 22.22,
-                'e_scooter_1': length / 6.25,
-                'walking': length / 1.5
-            }, distance=length)
-        # print(G.number_of_nodes(), G.number_of_edges())
+            max_speed = self.edge_map[connection[0]]['speed_limit']
+
+            bike_speed = max(float(entry['bike_speed']), 0.1)
+            car_speed = max(float(entry['car_speed']), 0.1)
+            pedestrian_speed = max(float(entry['pedestrian_speed']), 0.1)
+
+            travel_times = {
+                'e_bike_1': length / min(bike_speed, max_speed),
+                'e_car': length / min(car_speed, max_speed),
+                'e_scooter_1': length / min(bike_speed, max_speed),
+                'walking': length / min(pedestrian_speed, max_speed)
+            }
+
+            # Add edges to the graph with either modified or normal travel times
+            G.add_edge(connection[0], connection[1], travel_times=travel_times, distance=length)
+
         return G
 
     def shortest_path_for_mode(self, source, target, mode):
@@ -297,6 +261,7 @@ class Optimization:
         return mode_stations
 
     def calculate_all_modes_shortest_paths(self):
+        flag = True
         G = self.build_graph()  # Ensure this graph includes travel times correctly set up for each edge
 
         all_modes_shortest_paths = {}
@@ -323,12 +288,14 @@ class Optimization:
                             shortest_paths[(source, target)] = (path, total_time, total_distance)
                         except nx.NetworkXNoPath:
                             print(f"No path found from {source} to {target} for mode {mode}.")
+                            flag = False
 
             all_modes_shortest_paths[mode] = shortest_paths
 
-        return all_modes_shortest_paths
+        return all_modes_shortest_paths, flag
 
     def calculate_walking_paths_from_start(self, source, destination_edge):
+        flag = True
         G = self.G
 
         def walking_time(u, v, d):
@@ -348,12 +315,15 @@ class Optimization:
                     walking_paths[target] = (path, total_time, total_distance)
                 except nx.NodeNotFound:
                     print(f"Node not found from {source} to {target}")
+                    flag = False
                 except nx.NetworkXNoPath:
                     print(f"No walking path found from {source} to {target}.")
+                    flag = False
 
-        return walking_paths
+        return walking_paths, flag
 
     def calculate_walking_paths_to_destination(self, start_edge, destination_edge):
+        flag = True
         G = self.G  # Ensure this graph includes walking times as weights
 
         # Extract the walking time for an edge
@@ -376,10 +346,11 @@ class Optimization:
                     paths_to_destination[source] = (path, total_time, total_distance)
                 except nx.NodeNotFound:
                     print(f"Node not found from {source} to {destination_edge}.")
+                    flag = False
                 except nx.NetworkXNoPath:
                     print(f"No walking path found from {source} to {destination_edge}.")
-        print("paths_to_destination", paths_to_destination)
-        return paths_to_destination
+                    flag = False
+        return paths_to_destination, flag
 
     def build_new_graph(self, start_edge, destination_edge):
         paths_graph = nx.MultiDiGraph()
@@ -390,7 +361,9 @@ class Optimization:
         for node in all_station_edges:
             paths_graph.add_node(node)
 
-        all_modes_shortest_paths = self.calculate_all_modes_shortest_paths()
+        all_modes_shortest_paths, flag = self.calculate_all_modes_shortest_paths()
+        if flag is False:
+            return None
         for mode, mode_shortest_paths in all_modes_shortest_paths.items():
             for (source, target), (path, total_time, distance) in mode_shortest_paths.items():
                 if {source, target}.issubset(all_station_edges):
@@ -398,8 +371,12 @@ class Optimization:
                     paths_graph.add_edge(source, target, weight=total_time, path=path, pheromone_level=0.1,
                                          distance=distance, key=mode)
 
-        walking_paths_from_start = self.calculate_walking_paths_from_start(start_edge, destination_edge)
-        walking_paths_to_destination = self.calculate_walking_paths_to_destination(start_edge, destination_edge)
+        walking_paths_from_start, flag = self.calculate_walking_paths_from_start(start_edge, destination_edge)
+        if flag is False:
+            return None
+        walking_paths_to_destination, flag = self.calculate_walking_paths_to_destination(start_edge, destination_edge)
+        if flag is False:
+            return None
         for target, (path, total_time, distance) in walking_paths_from_start.items():
             if target in all_station_edges:
                 paths_graph.add_edge(start_edge, target, weight=total_time, key='walking', path=path,
@@ -414,62 +391,6 @@ class Optimization:
         # print("The graph edges are:", paths_graph.edges)
         # self.visualize_paths_graph(paths_graph)
         return paths_graph
-
-    def visualize_paths_graph_interactive(self, paths_graph, start_node, end_node):
-        # Initialize the Network object with cdn_resources set to 'remote' for better compatibility
-        nt = Network(notebook=True, height="750px", width="100%", bgcolor="#222222", font_color="white",
-                     cdn_resources='remote')
-
-        # Define colors for different types of edges and nodes
-        station_color = 'lightblue'
-        start_end_color = 'green'
-        walking_edge_color = 'lightgray'
-        other_edge_color = 'blue'
-
-        # Add nodes and edges with attributes
-        for node in paths_graph.nodes:
-            if node.startswith("station_"):
-                # Get station name without the prefix
-                station_name = node.replace("station_", "")
-                nt.add_node(node, title=station_name, color=station_color)
-            elif node == start_node or node == end_node:
-                nt.add_node(node, title=node, color=start_end_color)
-            else:
-                nt.add_node(node, title=node, color=other_edge_color)
-
-        for src, dst, attr in paths_graph.edges(data=True):
-            # Modify edge titles to display mode and total time
-            mode = attr.get('key', 'unknown')
-            total_time = attr.get('weight', 'unknown')
-            title = f"Mode: {mode}, Time: {total_time}"
-            if mode == 'walking':
-                nt.add_edge(src, dst, title=title, color=walking_edge_color, arrows='to')
-            elif mode == 'e_car':
-                nt.add_edge(src, dst, title=title, color='red', arrows='to')
-            elif mode == 'e_scooter_1':
-                nt.add_edge(src, dst, title=title, color='green', arrows='to')
-            else:
-                nt.add_edge(src, dst, title=title, color=other_edge_color, arrows='to')
-
-        # Configure the physics layout of the network
-        nt.set_options(options="""{
-          "physics": {
-            "barnesHut": {
-              "gravitationalConstant": -80000,
-              "centralGravity": 0.3,
-              "springLength": 100,
-              "springConstant": 0.04,
-              "damping": 0.09,
-              "avoidOverlap": 0.1
-            },
-            "minVelocity": 0
-          }
-        }""")
-
-        # Show the interactive plot, specifying the path where the HTML file will be saved
-        output_path = "paths_graph.html"
-        nt.show(output_path)
-        return output_path
 
     def visualize_paths_graph(self, paths_graph):
         plt.figure(figsize=(12, 12))  # Increase figure size
@@ -502,47 +423,6 @@ class Optimization:
         self.visualize_paths_graph(self.new_graph)
         print(self.new_graph.number_of_nodes(), self.new_graph.number_of_edges())
 
-    def update_pheromones(self, ant):
-        total_pheromone = 0
-        for i in range(0, len(ant.path) - 1):
-            edge_1, mode_1, _, _ = ant.path[i]
-            edge_2, mode_2, _, _ = ant.path[i + 1]
-            # Retrieve all edge data between edge_1 and edge_2
-            all_edges_data = self.new_graph.get_edge_data(edge_1, edge_2)
-
-            # Check if there are any edges between these nodes
-            if all_edges_data:
-                for key, edge_data in all_edges_data.items():
-                    if key == mode_2:
-                        # Correctly access and update pheromone level
-                        current_pheromone_level = edge_data.get('pheromone_level',
-                                                                0)  # Get current level, default to 0 if not set
-                        # Update pheromone level
-                        updated_pheromone_level = current_pheromone_level + self.pheromone_deposit_function(
-                            ant.total_time_cost) * 10000
-                        # Set the updated pheromone level back on the edge
-                        self.new_graph[edge_1][edge_2][key]['pheromone_level'] = updated_pheromone_level
-
-            total_pheromone = total_pheromone + self.new_graph[edge_1][edge_2][key]['pheromone_level']
-        return total_pheromone
-
-    def pheromone_deposit_function(self, path_cost):
-        # Higher deposit for faster paths
-        return 1 / path_cost  # Example function, adjust as needed
-
-    def find_best_path(self, ants, destination_edge, pheromones):
-        best_ant = None
-        best_phe = 0
-        for ant in ants:
-            # Check if the ant has reached the destination
-            if ant.path[-1][0] == destination_edge:
-                # If the ant has reached the destination and has a lower total time cost
-                if pheromones[ant] > best_phe:
-                    best_phe = pheromones[ant]
-                    best_ant = ant
-
-        return best_ant
-
     def run_aco_algorithm(self, start_edge, destination_edge, number_of_ants, number_of_iterations, mode='walking'):
         start_time = time.time()
         if start_edge not in self.unique_edges:
@@ -570,7 +450,7 @@ class Optimization:
 
         # print(self.edges_station)
         for ant_num in range(number_of_ants):
-            ant = Ant(start_edge, destination_edge, self.db_connection, self.edges, self.mode_stations, ant_index,
+            ant = Ant(start_edge, destination_edge, self.db_connection, self.mode_stations, ant_index,
                       self.new_graph, mode)
             print("ant", ant_index)
             move_count = 0

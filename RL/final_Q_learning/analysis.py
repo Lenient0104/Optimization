@@ -11,14 +11,14 @@ class Analysis(unittest.TestCase):
         self.source_edge = '361450282'
         self.target_edge = "-110407380#1"
         self.start_mode = 'walking'
-        self.ant_num = [100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000]
+        self.ant_num = [2200, 2400, 2600, 2800, 3000]
         self.episodes = [500, 1000, 1500, 2000]
         self.iteration = 1
         self.db_path = 'test_new.db'
         self.user = User(60, True, 0, 20)
 
     def test_run_optimizer(self):
-        optimizer_interface = Optimization(self.net_xml_path, self.user, self.db_path, self.source_edge,
+        optimizer_interface = Optimization(self.net_xml_path, self.user, self.db_path, 20000, 20, self.source_edge,
                                            self.target_edge)
         graph = optimizer_interface.new_graph
         test_size = 30
@@ -26,7 +26,7 @@ class Analysis(unittest.TestCase):
         all_aco_exe_times = []
         all_aco_time_costs = []
 
-        with open('ACO_results.csv', 'w', newline='') as file:
+        with open('ACO_results_parameters-1.csv', 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['Experiment ID', 'Number of Ants', 'Execution Time (seconds)', 'Time Cost (seconds)'])
 

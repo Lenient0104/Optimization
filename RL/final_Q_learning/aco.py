@@ -3,12 +3,11 @@ import random
 
 class Ant:
 
-    def __init__(self, start_edge, dest_edge, db_connection, edges, mode_stations, index, graph, mode='walking'):
-        self.edges = edges
+    def __init__(self, start_edge, dest_edge, db_connection, mode_stations, index, graph, mode='walking'):
         self.graph = graph
         self.mode_stations = mode_stations
         self.index = index
-        self.path_length = self.find_edge_length(start_edge)
+        # self.path_length = self.find_edge_length(start_edge)
         self.stop = False
         self.start_edge = start_edge
         self.dest_edge = dest_edge
@@ -35,21 +34,21 @@ class Ant:
         self.total_time_cost = 0
         self.device_to_return = False
 
-    def map_edge_to_length(self):
-        edge_distance = {}
-        for connection_id, edge_info in self.edges.items():
-            # Extract from_edge, to_edge, and length
-            from_edge = edge_info['from_edge']
-            to_edge = edge_info['to_edge']
-            if from_edge not in edge_distance:
-                edge_distance[from_edge] = edge_info['from_length']
-            if to_edge not in edge_distance:
-                edge_distance[to_edge] = edge_info['to_length']
-        return edge_distance
+    # def map_edge_to_length(self):
+    #     edge_distance = {}
+    #     for connection_id, edge_info in self.edges.items():
+    #         # Extract from_edge, to_edge, and length
+    #         from_edge = edge_info['from_edge']
+    #         to_edge = edge_info['to_edge']
+    #         if from_edge not in edge_distance:
+    #             edge_distance[from_edge] = edge_info['from_length']
+    #         if to_edge not in edge_distance:
+    #             edge_distance[to_edge] = edge_info['to_length']
+    #     return edge_distance
 
-    def find_edge_length(self, edge_id):
-        edge_distance = self.map_edge_to_length()
-        return edge_distance[edge_id]
+    # def find_edge_length(self, edge_id):
+    #     edge_distance = self.map_edge_to_length()
+    #     return edge_distance[edge_id]
 
     def get_best_vehicle_and_energy(self, vehicle_type):
         # Fetch the vehicle with the maximum energy level for the given type
@@ -152,7 +151,7 @@ class Ant:
         alpha = 1  # Pheromone importance
         beta = 0  # Heuristic importance
         gamma = 1  # Energy importance
-        edges = self.edges
+        # edges = self.edges
         probabilities = {}
         graph = self.graph
         current_loc, current_mode, current_vehicle_id, _ = self.path[-1]  # Current location and mode

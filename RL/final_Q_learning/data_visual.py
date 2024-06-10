@@ -2,15 +2,16 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Read the CSV file
-data = pd.read_csv('results-1.csv')
+data = pd.read_csv('Q_learning_results_0409.csv')
 
 # Group the data by 'Episode'
-grouped_data = data.groupby('Number of Ants')
+# grouped_data = data.groupby('Number of Ants')
+grouped_data = data.groupby('Episode')
 
 # Get the episodes and corresponding execution times and time costs
 episodes = list(grouped_data.groups.keys())
 all_execution_times = [grouped_data.get_group(episode)['Execution Time (seconds)'] for episode in episodes]
-all_time_costs = [grouped_data.get_group(episode)['Time Cost (seconds)'] for episode in episodes]
+all_time_costs = [grouped_data.get_group(episode)['Time Cost'] for episode in episodes]
 
 plt.rcParams.update({'font.size': 18})
 

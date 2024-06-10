@@ -9,10 +9,10 @@ class TestDQN(unittest.TestCase):
     def setUp(self):
         self.net_xml_path = '../../../optimization_interface/DCC.net.xml'
         self.start_mode = 'walking'
-        self.station_num = [10]
+        self.station_num = [20]
         self.energy_rate = [1]
         self.simulation_time = [20000]
-        self.episodes = [1000]
+        self.episodes = [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000]
         self.iteration = 1
         self.db_path = '../../../optimization_interface/test_new.db'
         self.user = User(60, True, 0, 20)

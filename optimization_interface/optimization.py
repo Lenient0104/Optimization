@@ -110,10 +110,6 @@ class Optimization:
         # for i in range(station_num):
         #     e_tools = self.select_random_tools(seed+i)
         #     e_tools_distribution.append(e_tools)
-        # #
-        #
-        #
-        #
         # if station_num == 20:
         #     i = 0
         #     for edge_id in edge_to_assign_new:
