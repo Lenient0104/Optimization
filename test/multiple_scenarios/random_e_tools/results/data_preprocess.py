@@ -40,10 +40,10 @@ print("Q-learning Fixed Valid Experiments Count:", q_learning_fixed_valid.shape[
 print("Q-learning Random Valid Experiments Count:", q_learning_random_valid.shape[0])
 
 # 保存结果
-aco_fixed_valid.to_csv('valid_aco_fixed_results.csv', index=False)
-aco_random_valid.to_csv('valid_aco_random_results.csv', index=False)
-q_learning_fixed_valid.to_csv('valid_q_learning_fixed_results.csv', index=False)
-q_learning_random_valid.to_csv('valid_q_learning_random_results.csv', index=False)
+aco_fixed_valid.to_csv('valid_aco_nopreference_results.csv', index=False)
+aco_random_valid.to_csv('valid_aco_noecar_results.csv', index=False)
+q_learning_fixed_valid.to_csv('valid_q_learning_noecar_results.csv', index=False)
+q_learning_random_valid.to_csv('valid_q_learning_noecar_results.csv', index=False)
 
 # 输出统计
 print("Total Valid Experiments Count:", len(valid_indices))

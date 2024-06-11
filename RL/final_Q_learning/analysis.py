@@ -11,7 +11,7 @@ class Analysis(unittest.TestCase):
         self.source_edge = '361450282'
         self.target_edge = "-110407380#1"
         self.start_mode = 'walking'
-        self.ant_num = [2200, 2400, 2600, 2800, 3000]
+        self.ant_num = [2000]
         self.episodes = [500, 1000, 1500, 2000]
         self.iteration = 1
         self.db_path = 'test_new.db'

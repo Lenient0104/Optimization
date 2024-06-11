@@ -37,21 +37,30 @@ def plot_box_plot_travel_time(filtered_data):
     """
     # Get unique number of ants
     # unique_episodes = filtered_data['Episode'].unique()
-    unique_ants = filtered_data['Episode'].unique()
+    unique_ants = filtered_data['Number of Ants'].unique()
 
     # Prepare data for plotting
     # all_data = [filtered_data[filtered_data['Number of Ants'] == ant]['Travel Time Cost (seconds)'].dropna() for ant in
     #             unique_ants]
-    all_data = [filtered_data[filtered_data['Episode'] == ant]['Time Cost'].dropna() for ant in
+    all_data = [filtered_data[filtered_data['Number of Ants'] == ant]['Time Cost (seconds)'].dropna() for ant in
                 unique_ants]
 
     # Plot box plot
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(10, 6))
+    plt.rcParams.update({
+        'font.size': 18,  # Global font size
+        'axes.titlesize': 20,  # Title font size
+        'axes.labelsize': 18,  # X and Y axis labels font size
+        'xtick.labelsize': 18,  # X tick labels font size
+        'ytick.labelsize': 18,  # Y tick labels font size
+        'legend.fontsize': 18,  # Legend font size
+        'figure.titlesize': 22  # Figure title font size
+    })
     plt.boxplot(all_data, labels=unique_ants)
-    plt.xlabel('Number of Episode')
+    plt.xlabel('Number of Ants')
     plt.ylabel('Travel Time Cost (seconds)')
-    plt.title('Q Learning Box Plot of Travel Time Cost for Different Number of Episode')
-    plt.savefig('Q Learning Box Plot of Travel Time Cost for Different Number of Episode')
+    plt.title('ACO Box Plot of Travel Time Cost for Different Number of Ants')
+    plt.savefig('ACO Box Plot of Travel Time Cost for Different Number of Ants.eps', format='eps')
     plt.show()
 
 
@@ -64,26 +73,35 @@ def plot_box_plot_execution_time(filtered_data):
     """
     # Get unique number of ants
     # unique_episodes = filtered_data['Episode'].unique()
-    unique_ants = filtered_data['Episode'].unique()
+    unique_ants = filtered_data['Number of Ants'].unique()
 
     # Prepare data for plotting
     # all_data = [filtered_data[filtered_data['Number of Ants'] == ant]['Travel Time Cost (seconds)'].dropna() for ant in
     #             unique_ants]
-    all_data = [filtered_data[filtered_data['Episode'] == ant]['Execution Time (seconds)'].dropna() for ant in
+    all_data = [filtered_data[filtered_data['Number of Ants'] == ant]['Execution Time (seconds)'].dropna() for ant in
                 unique_ants]
 
     # Plot box plot
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(10, 6))
+    plt.rcParams.update({
+        'font.size': 18,  # Global font size
+        'axes.titlesize': 20,  # Title font size
+        'axes.labelsize': 18,  # X and Y axis labels font size
+        'xtick.labelsize': 18,  # X tick labels font size
+        'ytick.labelsize': 18,  # Y tick labels font size
+        'legend.fontsize': 18,  # Legend font size
+        'figure.titlesize': 22  # Figure title font size
+    })
     plt.boxplot(all_data, labels=unique_ants)
-    plt.xlabel('Number of Episode')
+    plt.xlabel('Number of Ants')
     plt.ylabel('Execution Time (seconds)')
-    plt.title('Q Learning Box Plot of Execution Time for Different Number of Episode')
+    plt.title('ACO Box Plot of Execution Time for Different Number of Ants')
     # plt.autoscale()
-    plt.savefig('Q Learning Box Plot of Execution Time for Different Number of Episode')
+    plt.savefig('ACO Box Plot of Execution Time for Different Number of Ants.eps', format='eps')
     plt.show()
 
 
 # Call the functions
-filtered_data = filter_data("modified_Q-parameter-file.csv")
+filtered_data = filter_data("modified_aco-parameter-file.csv")
 plot_box_plot_travel_time(filtered_data)
 plot_box_plot_execution_time(filtered_data)

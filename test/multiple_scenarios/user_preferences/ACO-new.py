@@ -33,7 +33,7 @@ class Analysis(unittest.TestCase):
         all_aco_exe_time_costs = []
         all_aco_time_costs = []
 
-        with open('results/ACO-noecar.csv', 'w', newline='') as file:
+        with open('results/ACO-test', 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['Experiment ID', 'Number of Ants', 'Simulation Time', 'Station Number', 'Initial Energy', 'Travel Time Cost (seconds)',
                              'Execution Time (seconds)', 'Path', 'Find'])

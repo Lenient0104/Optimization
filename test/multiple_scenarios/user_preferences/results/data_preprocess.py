@@ -1,12 +1,12 @@
 import pandas as pd
 
 # 加载数据
-aco_data = pd.read_csv('Updated_ACO_1.csv')
-q_learning_data = pd.read_csv('Updated_Q_1.csv')
+aco_data = pd.read_csv('ACO-noecar-0611.csv')
+# q_learning_data = pd.read_csv('Updated_Q_1.csv')
 
 # 处理'Find'列的NA/NAN值，将其视为False
 aco_data['Find'].fillna(False, inplace=True)
-q_learning_data['Find'].fillna(False, inplace=True)
+# q_learning_data['Find'].fillna(False, inplace=True)
 
 # 分离Fixed和Random数据，并重新编号
 aco_fixed = aco_data[aco_data['User Preference'] == 'No Preference'].reset_index(drop=True)
@@ -40,10 +40,10 @@ print("Q-learning Fixed Valid Experiments Count:", q_learning_fixed_valid.shape[
 print("Q-learning Random Valid Experiments Count:", q_learning_random_valid.shape[0])
 
 # 保存结果
-aco_fixed_valid.to_csv('valid_aco_fixed_results.csv', index=False)
-aco_random_valid.to_csv('valid_aco_random_results.csv', index=False)
-q_learning_fixed_valid.to_csv('valid_q_learning_fixed_results.csv', index=False)
-q_learning_random_valid.to_csv('valid_q_learning_random_results.csv', index=False)
+aco_fixed_valid.to_csv('valid_aco_nopreference_results.csv', index=False)
+aco_random_valid.to_csv('valid_aco_noecar_results.csv', index=False)
+q_learning_fixed_valid.to_csv('valid_q_learning_noecar_results.csv', index=False)
+q_learning_random_valid.to_csv('valid_q_learning_noecar_results.csv', index=False)
 
 # 输出统计
 print("Total Valid Experiments Count:", len(valid_indices))
