@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Data setup
-main_scenarios = ["Energy Rate\n(Q Learning > ACO)", "E-Tools Distribution\n(Q Learning > ACO)", "User Preference\n(Q Learning > ACO)"]
+main_scenarios = ["Energy Rate\n(Q-learning > ACO)", "E-Tools Distribution\n(Q-learning > ACO)", "User Preference\n(Q-learning > ACO)"]
 sub_scenarios = [
     "More Energy", "Less Energy",
     "Fixed", "Random",
@@ -36,7 +36,7 @@ for i, (perc, color) in enumerate(zip(percentages, colors)):
 
 # Add labels and title
 ax.set_xlabel('Main Scenarios', fontsize=16)
-ax.set_ylabel('Percentage (%) Where Travel Time Cost of Q-Learning > ACO', fontsize=14)
+ax.set_ylabel('Percentage of OD Pairs (%)', fontsize=14)
 ax.set_xticks(index)
 ax.set_xticklabels(main_scenarios, fontsize=14)
 
@@ -62,7 +62,7 @@ for bar_group in bars:
 
 # Set y-axis limit to make differences more pronounced
 ax.set_ylim(0, max(percentages) + 5)
-fig.set_size_inches(8, 8)
+fig.set_size_inches(10, 6)
 fig.tight_layout()
-plt.savefig('data_v.png')
+plt.savefig('multiple-scenarios.eps', format='eps')
 plt.show()
