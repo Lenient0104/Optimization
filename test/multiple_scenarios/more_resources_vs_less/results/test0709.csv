@@ -1,0 +1,4 @@
+Experiment ID,Number of Ants,Simulation Time,Station Number,Initial Energy,Travel Time Cost (seconds),Execution Time (seconds),Find
+2000-1,2000,20000,10,0.1,5702.365381532288,1.2447617053985596,True
+2000-2,2000,20000,10,0.1,6774.768074743778,0.4034881591796875,True
+2000-3,2000,20000,10,0.1,3370.6036166173,0.4045441150665283,True
