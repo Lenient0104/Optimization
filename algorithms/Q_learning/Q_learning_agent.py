@@ -109,7 +109,6 @@ class MultiModalQLearningAgent:
 
     def learn(self, start, destination, episodes, energy_rate, progress_check_interval=100, initial_energy=100):
         total_times = []
-        file = open("records_new.csv", "w")
         for episode in range(1, episodes + 1):
             step = 0
             route = []
@@ -123,10 +122,10 @@ class MultiModalQLearningAgent:
             # print('current energy:', current_energy)
             last_mode = None  # Track the last mode used
             done = False
-            writer = csv.writer(file)
-            writer.writerow(
-                ["action", "time", 'total time', 'distance', 'energy', 'reward', 'old_q', 'new_q',
-                 'done', 'step'])
+            # writer = csv.writer(file)
+            # writer.writerow(
+            #     ["action", "time", 'total time', 'distance', 'energy', 'reward', 'old_q', 'new_q',
+            #      'done', 'step'])
             max_step = 0
             while not done:
                 action = self.choose_action(current_state, current_energy)
@@ -176,9 +175,9 @@ class MultiModalQLearningAgent:
                 #     reward = 10 * (-10000)
 
                 old_q, new_q = self.update_q_value(pre_state, action, reward, current_energy, energy_rate)
-                writer.writerow(
-                    [action, time, total_time, distance, current_energy, reward, old_q, new_q,
-                     done, step])
+                # writer.writerow(
+                #     [action, time, total_time, distance, current_energy, reward, old_q, new_q,
+                #      done, step])
                 step += 1
 
             # print(self.epsilon)
@@ -189,7 +188,7 @@ class MultiModalQLearningAgent:
         #
         # plt.plot(total_times)
         # plt.show()
-        file.close()
+        # file.close()
 
     def print_optimal_path(self, start, destination):
 

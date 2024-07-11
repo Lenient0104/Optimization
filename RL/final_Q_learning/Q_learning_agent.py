@@ -190,7 +190,7 @@ if __name__ == '__main__':
     optimizer = Optimization(net_xml_path, user, db_path, 20000, 20, source_edge, target_edge)
     graph = optimizer.new_graph
 
-    with open('Q_learning_results_parameters.csv', 'w', newline='') as file:
+    with open('0710.csv', 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Experiment ID', 'Episode', 'Execution Time (seconds)', 'Time Cost'])
 
