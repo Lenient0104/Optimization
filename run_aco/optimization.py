@@ -18,6 +18,7 @@ class Optimization:
         self.mode_stations = None
         self.new_graph = None
         self.user = user
+        self.simulation_data = {}
         self.simulation = simulation
         self.station_num = station_num
         self.unique_edges = []
@@ -188,7 +189,7 @@ class Optimization:
                                                                 0)  # Get current level, default to 0 if not set
                         # Update pheromone level
                         updated_pheromone_level = current_pheromone_level + self.pheromone_deposit_function(
-                            ant.total_time_cost) * 100000000
+                            ant.total_time_cost) * 100000
                         # Set the updated pheromone level back on the edge
                         self.new_graph[edge_1][edge_2][key]['pheromone_level'] = updated_pheromone_level
 
@@ -206,6 +207,7 @@ class Optimization:
         with open(filename) as f:
             data = json.load(f)
         data_dict = {entry['edge_id']: entry for entry in data}
+        self.simulation_data = data_dict
         return data_dict
 
     def build_graph(self):

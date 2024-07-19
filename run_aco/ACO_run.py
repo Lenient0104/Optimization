@@ -1,4 +1,4 @@
-from run import aco
+from run_aco import aco
 from user_info import User
 from optimization import Optimization
 
@@ -34,7 +34,8 @@ class ACO_RUN:
         else:
             path, time_cost, exe_time = aco.run_aco_algorithm(optimizer_interface, self.start_edge, self.destination_edge,
                                                               self.ant_num, self.energy_rate)
-            print(time_cost, path)
+            print("The total time cost is:", time_cost, "seconds")
+            print("The optimal path is:", path)
 
 
 if __name__ == "__main__":

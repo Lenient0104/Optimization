@@ -204,7 +204,7 @@ class MultiModalQLearningAgent:
         # plt.show()
         # file.close()
 
-    def print_optimal_path(self, start, destination):
+    def print_optimal_path(self, optimizer, start, destination):
 
         current_state = start
         optimal_path = []
@@ -235,14 +235,31 @@ class MultiModalQLearningAgent:
             modes.append(mode)
             distance = self.graph[current_state][next_state][mode]['distance']
             time = self.graph[current_state][next_state][mode]['weight']
+            path = self.graph[current_state][next_state][mode]['path']
             if last_mode != mode:
                 initial_energy = 100
                 vehicle_id = self.get_best_vehicle(mode)
             energy_consumed = self.calculate_energy_comsumption(mode, distance)
+            begin_energy = initial_energy
             initial_energy = initial_energy - energy_consumed
             total_time += time
-
-            optimal_path.append((current_state, next_state, mode, vehicle_id, initial_energy))
+            mode_key = None
+            for edge in path:
+                unit_energy_consumption = self.calculate_energy_comsumption(mode, optimizer.edge_map[edge]['length'])
+                if mode == 'walking':
+                    mode_key = "pedestrian_speed"
+                elif mode == 'e_bike_1' or mode == 'e_scooter_1':
+                    mode_key = "bike_speed"
+                elif mode == 'e_car':
+                    mode_key = "car_speed"
+                edge_speed = float(optimizer.simulation_data[edge][mode_key])
+                if edge_speed == 0:
+                    unit_time = 50
+                else:
+                    unit_time = optimizer.edge_map[edge]['length'] / edge_speed
+                unit_remaining_energy = begin_energy-unit_energy_consumption
+                begin_energy = unit_remaining_energy
+                optimal_path.append((edge, mode, vehicle_id, unit_remaining_energy, edge_speed, unit_time))
             current_state = next_state
             route.append(current_state)
             last_mode = mode
@@ -264,7 +281,7 @@ def run_q_learning(optimizer, source_edge, target_edge, episode_number, energy_r
     agent = MultiModalQLearningAgent(optimizer.new_graph)
     start_time = tm.time()
     agent.learn(source_edge, target_edge, episode_number, energy_rate)
-    best_route, best_modes, time_cost, find = agent.print_optimal_path(source_edge, target_edge)
+    best_route, best_modes, time_cost, find = agent.print_optimal_path(optimizer, source_edge, target_edge)
     time_cost = time_cost + optimizer.edge_map[target_edge]['length'] / 1.5
     end_time = tm.time()
     execution_time = end_time - start_time

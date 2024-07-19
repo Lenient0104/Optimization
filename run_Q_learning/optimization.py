@@ -22,6 +22,7 @@ class Optimization:
         self.station_num = station_num
         self.unique_edges = []
         self.connections = []
+        self.simulation_data = {}
         self.net_xml_path = net_xml_path
         self.db_connection = sqlite3.connect(db_path)
 
@@ -206,6 +207,7 @@ class Optimization:
         with open(filename) as f:
             data = json.load(f)
         data_dict = {entry['edge_id']: entry for entry in data}
+        self.simulation_data = data_dict
         return data_dict
 
     def build_graph(self):

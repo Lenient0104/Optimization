@@ -32,6 +32,7 @@ class Q_RUN:
         graph = optimizer.new_graph
 
         best_route, best_modes, total_time_cost, execution_time, find = Q_learning_agent.run_q_learning(optimizer, self.start_edge, self.destination_edge, self.episodes, self.energy_rate)
+        print("The total time cost is:", total_time_cost, 'seconds')
         if not find:
             print("Failed to find a valid path")
         # else:

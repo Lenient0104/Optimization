@@ -188,7 +188,7 @@ class Optimization:
                                                                 0)  # Get current level, default to 0 if not set
                         # Update pheromone level
                         updated_pheromone_level = current_pheromone_level + self.pheromone_deposit_function(
-                            ant.total_time_cost) * 100000000
+                            ant.total_time_cost)
                         # Set the updated pheromone level back on the edge
                         self.new_graph[edge_1][edge_2][key]['pheromone_level'] = updated_pheromone_level
 
@@ -226,6 +226,13 @@ class Optimization:
             bike_speed = max(float(entry['bike_speed']), 0.1)
             car_speed = max(float(entry['car_speed']), 0.1)
             pedestrian_speed = max(float(entry['pedestrian_speed']), 0.1)
+
+            edge_speed = {
+                'e_bike_1': bike_speed,
+                'e_car': car_speed,
+                'e_scooter_1': bike_speed,
+                'walking': pedestrian_speed
+            }
 
             travel_times = {
                 'e_bike_1': length / min(bike_speed, max_speed),
