@@ -189,7 +189,7 @@ class Optimization:
                                                                 0)  # Get current level, default to 0 if not set
                         # Update pheromone level
                         updated_pheromone_level = current_pheromone_level + self.pheromone_deposit_function(
-                            ant.total_time_cost) * 100000
+                            ant.total_time_cost) * 10000
                         # Set the updated pheromone level back on the edge
                         self.new_graph[edge_1][edge_2][key]['pheromone_level'] = updated_pheromone_level
 

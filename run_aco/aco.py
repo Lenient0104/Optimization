@@ -507,8 +507,8 @@ def run_aco_algorithm(optimizer, start_edge, destination_edge, number_of_ants, e
             if len(ant.path) > 2 and (ant.path[-1][0] == ant.path[-2][0]):
                 break
             move_count += 1
-        if ant_num == 2:
-            print('hehe')
+        # if ant_num == 2:
+        #     print('hehe')
             if move_count > 1000:
                 # print("Move limit reached, breaking out of loop.")
                 break
