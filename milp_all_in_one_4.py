@@ -67,7 +67,7 @@ class GraphHandler:
 
 class PreferenceGenerator:
     def __init__(self, G, station_types, num_preferred_nodes):
-        self.G = G
+        self.G = G  # original graph
         self.station_types = station_types
         self.num_preferred_nodes = num_preferred_nodes
 
@@ -99,7 +99,6 @@ class PreferenceGenerator:
 
         for i in self.G.nodes:
             if i in preferred_nodes:
-                # num_preferred = random.randint(1, len(self.station_types) - 1)
                 preferred_types = [st for st in self.station_types if st != 'walk']
                 preferred_station[i] = preferred_types  # random.sample(preferred_types, num_preferred)
                 if 'walk' not in preferred_station[i]:
@@ -142,31 +141,26 @@ class OptimizationProblem:
     def setup_costs(self):
         self.costs = {}
         for i, j in self.G.edges():
-            edge_weight = self.G[i][j]['weight']
-            edge_id = i
-            speeds = self.speed_dict[edge_id]
+            # i 和 j 是两条边
+            edge_weight = self.G[i][j]['weight']  # distance
+            speeds = self.speed_dict[i]
 
-            for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
+            for s in set(self.preferred_station[i]).intersection(self.preferred_station[j]):
                 if s != 'walk':
                     # if  s not in self.user_preference:
                     if s not in self.user_preference:
                         self.costs[i, j, s] = edge_weight * 1e7
                     else:
-                        if s == 'eb' or s == 'es':
+                        if s in ['eb', 'es']:
                             speed = speeds['bike_speed']
                         elif s == 'ec':
                             speed = speeds['car_speed']
 
-                        if speed == 0:
-                            self.costs[i, j, s] = 1e7  # float('inf')
-                        else:
-                            self.costs[i, j, s] = edge_weight / (speed)
+                        self.costs[i, j, s] = 1e7 if speed == 0 else edge_weight / speed
+
                 else:
                     speed = speeds['pedestrian_speed']
-                    if speed == 0:
-                        self.costs[i, j, s] = 1e7  # float('inf')
-                    else:
-                        self.costs[i, j, s] = edge_weight / speed
+                    self.costs[i, j, s] = 1e7 if speed == 0 else edge_weight / speed
 
         self.station_change_costs = {}
         for i in self.G.nodes:
@@ -177,16 +171,58 @@ class OptimizationProblem:
                             self.station_change_costs[i, s1, s2] = 0.1
                         else:
                             self.station_change_costs[i, s1, s2] = self.M
+
     def set_up_fees(self):
         self.fees = {}
-        for i,j in self.G.edges()
-    def set_up_walking_distance(self):
-    def set_up_safety(self):
+        # 成本系数
+        cost_coefficients = {
+            'ec': 0.05,  # 电动汽车每公里成本
+            'eb': 0.01,  # 电动自行车每公里成本
+            'es': 0.02,  # 电动滑板车每公里成本
+            'walk': 0  # 步行每公里成本
+        }
 
+        # 利润率
+        profit_margins = {
+            'ec': 0.15,
+            'eb': 0.10,
+            'es': 0.12,
+            'walk': 0
+        }
+
+        for i, j in self.G.edges():
+            edge_weight = self.G[i][j]['weight']
+            for s in set(self.preferred_station[i]).intersection(self.preferred_station[j]):
+                if s not in self.user_preference:
+                    self.fees[i, j, s] = 1e7
+                else:
+                    base_cost = cost_coefficients[s] * edge_weight
+                    self.fees[i, j, s] = base_cost * (1 + profit_margins[s])
+
+    def set_up_walking_distance(self):
+        self.walk_distances = {}
+        for i, j in self.G.edges():
+            edge_weight = self.G[i][j]['weight']
+            for s in set(self.preferred_station[i]).intersection(self.preferred_station[j]):
+                if s == 'walk':
+                    self.walk_distances[i, j, s] = edge_weight
+
+    def set_up_safety(self):
+        self.safety_scores = {}
+        safety_level = {
+            'es': 1,
+            'eb': 2,
+            'ec': 3,
+            'walk': 4
+        }
+        for i, j in self.G.edges():
+            for s in set(self.preferred_station[i]).intersection(self.preferred_station[j]):
+                self.safety_scores[i, j, s] = safety_level[s]
 
     def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes):
         self.prob = pulp.LpProblem("Minimize_Traversal_Cost", pulp.LpMinimize)
         self.prob += pulp.lpSum([self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths]) + \
+                    pulp.lpSum([self.paths[i, j, s] * ])
                      pulp.lpSum([self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
                                  self.station_changes])
 
@@ -277,7 +313,8 @@ class ShortestPathComputer:
             try:
                 shortest_path = nx.shortest_path(self.graph, source=start_node, target=station, weight='weight')
                 shortest_routes_start[station] = (
-                shortest_path, nx.shortest_path_length(self.graph, source=start_node, target=station, weight='weight'))
+                    shortest_path,
+                    nx.shortest_path_length(self.graph, source=start_node, target=station, weight='weight'))
             except nx.NetworkXNoPath:
                 pass
         return shortest_routes_start
@@ -304,7 +341,8 @@ class ShortestPathComputer:
             try:
                 shortest_path = nx.shortest_path(self.graph, source=station, target=dest_node, weight='weight')
                 shortest_routes_dest[station] = (
-                shortest_path, nx.shortest_path_length(self.graph, source=station, target=dest_node, weight='weight'))
+                    shortest_path,
+                    nx.shortest_path_length(self.graph, source=station, target=dest_node, weight='weight'))
             except nx.NetworkXNoPath:
                 pass
         return shortest_routes_dest
@@ -313,7 +351,8 @@ class ShortestPathComputer:
         try:
             shortest_path = nx.shortest_path(self.graph, source=start_node, target=dest_node, weight='weight')
             shortest_route_start_end = (
-            shortest_path, nx.shortest_path_length(self.graph, source=start_node, target=dest_node, weight='weight'))
+                shortest_path,
+                nx.shortest_path_length(self.graph, source=start_node, target=dest_node, weight='weight'))
             return shortest_route_start_end
         except nx.NetworkXNoPath:
             return None
