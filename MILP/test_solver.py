@@ -155,7 +155,6 @@ class OptimizationProblem:
                         var_name = f"station_change_{i}_{s1}_{s2}"
                         self.station_changes[i, s1, s2] = self.model.addVar(vtype=GRB.BINARY, name=var_name)
 
-
         # 初始化每个节点上每个交通工具的能量变量
         for i in self.G.nodes:
             self.energy_vars[i] = {}  # 初始化每个节点的子字典
@@ -165,8 +164,6 @@ class OptimizationProblem:
                     vtype=GRB.CONTINUOUS,
                     name=var_name
                 )
-
-
 
     def setup_costs(self):
         # 设置路径的传输成本
@@ -211,13 +208,18 @@ class OptimizationProblem:
                     elif s == 'eb':
                         ebike_calculator = e_bike.Ebike_PowerConsumptionCalculator()
                         self.energy_constraints[i, j, s] = ebike_calculator.calculate(
-                            speeds['bike_speed'], m, 0)
+                            speeds['bike_speed'], m, 1)
                     else:
                         ecar_calculator = e_car.ECar_EnergyConsumptionModel(4)
                         self.energy_constraints[i, j, s] = ecar_calculator.calculate_energy_loss(
                             speeds['car_speed'])
+                        if self.energy_constraints[i, j, s] == 0:
+                            self.energy_constraints[i, j, s] = 50
                 else:
                     self.energy_constraints[i, j, s] = 0
+        test = self.energy_constraints['-13904652', '41502636#0', 'ec']
+        print(test)
+
 
     def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes):
         # 设置目标函数
@@ -258,12 +260,23 @@ class OptimizationProblem:
         self.model.addConstr(gp.quicksum(self.station_changes.values()) <= max_station_changes,
                              name="max_station_changes")
 
-        initial_energy = 100  # 设备切换后的初始能量
+        initial_energy = 50  # 设备切换后的初始能量
+
+        # 添加站点转换时的能量重置逻辑
+        for i in self.G.nodes:
+            for s1 in self.node_stations[i]:
+                for s2 in self.node_stations[i]:
+                    if s1 != s2:
+                        # 如果发生了站点转换，新的交通工具的能量重置为 50
+                        self.model.addConstr(
+                            self.energy_vars[i][s2] >= self.station_changes[i, s1, s2] * initial_energy,
+                            name=f"EnergyReset_{i}_{s1}_{s2}"
+                        )
 
         for i, j in self.G.edges():
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
                 energy_consumption = self.energy_constraints[i, j, s]
-                print(energy_consumption)
+                print(s, energy_consumption)
 
                 # 确保只有当能量足够时，才能选择这条路径
                 self.model.addConstr(
@@ -277,16 +290,7 @@ class OptimizationProblem:
                     name=f"EnergyConsumption_{i}_{j}_{s}"
                 )
 
-        # 添加站点转换时的能量重置逻辑
-        for i in self.G.nodes:
-            for s1 in self.node_stations[i]:
-                for s2 in self.node_stations[i]:
-                    if s1 != s2:
-                        # 如果发生了站点转换，新的交通工具的能量重置为 100
-                        self.model.addConstr(
-                            self.energy_vars[i][s2] >= self.station_changes[i, s1, s2] * initial_energy,
-                            name=f"EnergyReset_{i}_{s1}_{s2}"
-                        )
+
 
     def solve(self):
         start_time = time.time()
@@ -311,10 +315,12 @@ class PathFinder:
         self.station_changes = station_changes  # Gurobi decision variables for station changes
         self.costs = costs  # Costs associated with paths
         self.station_change_costs = station_change_costs  # Costs associated with station changes
+        # self.energy_constraints = energy_constraints
 
     def generate_path_sequence(self, start_node, start_station, end_node, end_station):
         current_node, current_mode = start_node, start_station
         path_sequence = []
+        energy_consumption_sequence = []  # List to store energy consumption
         station_change_count = 0
         destination_reached = False
 
@@ -768,13 +774,13 @@ with open(output_csv_file, 'w', newline='') as csvfile:
                 # Solve the problem and measure execution time
                 prob, execution_time = optimization_problem.solve()
 
-            #     if optimization_problem.model.status == GRB.INFEASIBLE:
-            #         print("Model is infeasible. Computing IIS...")
-            #         optimization_problem.model.computeIIS()
-            #         optimization_problem.model.write("model.ilp")
-            #         print("IIS written to file 'model.ilp'")
-            # except gp.GurobiError as e:
-            #     print(f"Gurobi Error: {e}")
+                #     if optimization_problem.model.status == GRB.INFEASIBLE:
+                #         print("Model is infeasible. Computing IIS...")
+                #         optimization_problem.model.computeIIS()
+                #         optimization_problem.model.write("model.ilp")
+                #         print("IIS written to file 'model.ilp'")
+                # except gp.GurobiError as e:
+                #     print(f"Gurobi Error: {e}")
 
                 if optimization_problem.model.status == GRB.OPTIMAL:
                     total_cost = optimization_problem.model.ObjVal
