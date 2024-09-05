@@ -5,6 +5,9 @@ import numpy as np  # 1.21.0
 import random
 # import matplotlib.pyplot as plt  # 3.3.2
 from tqdm import tqdm
+from energy_consumption_model import e_scooter
+from energy_consumption_model import e_bike
+from energy_consumption_model import e_car
 import xml.etree.ElementTree as ET
 import networkx as nx
 import re
@@ -69,10 +72,9 @@ class GraphHandler:
 
 
 class PreferenceGenerator:
-    def __init__(self, G, station_types, num_preferred_nodes):
-        self.G = G
-        self.station_types = station_types
-        self.num_preferred_nodes = num_preferred_nodes
+    def __init__(self, G, station_types):
+        self.G = G  # original graph
+        self.station_types = station_types  # station_types = ['eb', 'es', 'ec', 'walk']
 
     def generate_node_preferences(self):
         preferred_station = {}
@@ -80,9 +82,10 @@ class PreferenceGenerator:
         #                   '74233405#1', '129774671#0', '23395388#5', '-64270141'] #random.sample(list(self.G.nodes), self.num_preferred_nodes)
         # 20
         preferred_nodes = ['361409608#3', '3791905#2', '-11685016#2', '369154722#2', '244844370#0', '37721356#0',
-                              '74233405#1', '129774671#0', '23395388#5', '-64270141', '18927706#0', '-42471880',
-                              '67138626#1', '41502636#0', '-75450412', '-23347664#1', '14151839#3', '-12341242#1', '-13904652',
-                              '-47638297#3']
+                           '74233405#1', '129774671#0', '23395388#5', '-64270141', '18927706#0', '-42471880',
+                           '67138626#1', '41502636#0', '-75450412', '-23347664#1', '14151839#3', '-12341242#1',
+                           '-13904652',
+                           '-47638297#3']
         # 50
         # preferred_nodes = ['-52881219#6', '3788262#0', '-36819763#3', '151482073', '-44432110#1', '-45825602#2',
         #                    '-37721078#5', '-4834964#1', '59433202', '-441393227#1',
@@ -113,8 +116,6 @@ class PreferenceGenerator:
         return preferred_station, preferred_nodes
 
 
-
-
 class OptimizationProblem:
     def __init__(self, G, node_stations, preferred_station, M, speed_dict, user_preference, congestion=1):
         self.G = G
@@ -122,18 +123,19 @@ class OptimizationProblem:
         self.preferred_station = preferred_station
         self.M = M
         self.speed_dict = speed_dict
-        self.user_preference = user_preference
+        self.user_preference = user_preference  # user_preference = ['eb', 'ec', 'es']
         self.congestion = congestion
         self.model = None
         self.paths = {}
+        self.energy_constraints = {}
         self.station_changes = {}
         self.costs = {}
+        self.energy_vars = {}
         self.station_change_costs = {}
 
     def setup_model(self):
         # 初始化 Gurobi 模型
         self.model = gp.Model("Minimize_Traversal_Cost")
-
 
     def setup_decision_variables(self):
         if self.model is None:
@@ -152,6 +154,19 @@ class OptimizationProblem:
                     if s1 != s2:
                         var_name = f"station_change_{i}_{s1}_{s2}"
                         self.station_changes[i, s1, s2] = self.model.addVar(vtype=GRB.BINARY, name=var_name)
+
+
+        # 初始化每个节点上每个交通工具的能量变量
+        for i in self.G.nodes:
+            self.energy_vars[i] = {}  # 初始化每个节点的子字典
+            for s in self.node_stations[i]:  # 遍历每个节点的交通工具
+                var_name = f"energy_{i}_{s}"
+                self.energy_vars[i][s] = self.model.addVar(
+                    vtype=GRB.CONTINUOUS,
+                    name=var_name
+                )
+
+
 
     def setup_costs(self):
         # 设置路径的传输成本
@@ -181,22 +196,50 @@ class OptimizationProblem:
                         else:
                             self.station_change_costs[i, s1, s2] = self.M
 
-    def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes):
+    def setup_energy_constraints(self, m):
+        for i, j in self.G.edges():
+            edge_id = i
+            speeds = self.speed_dict[edge_id]
+            for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
+                if s != 'walk':
+                    if s == 'es':
+                        escooter_calculator = e_scooter.Escooter_PowerConsumptionCalculator()
+                        # 计算能量消耗
+                        self.energy_constraints[i, j, s] = escooter_calculator.calculate(
+                            speeds['bike_speed'], m
+                        )
+                    elif s == 'eb':
+                        ebike_calculator = e_bike.Ebike_PowerConsumptionCalculator()
+                        self.energy_constraints[i, j, s] = ebike_calculator.calculate(
+                            speeds['bike_speed'], m, 0)
+                    else:
+                        ecar_calculator = e_car.ECar_EnergyConsumptionModel(4)
+                        self.energy_constraints[i, j, s] = ecar_calculator.calculate_energy_loss(
+                            speeds['car_speed'])
+                else:
+                    self.energy_constraints[i, j, s] = 0
 
+    def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes):
         # 设置目标函数
         obj = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
-              gp.quicksum(self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in self.station_changes)
+              gp.quicksum(self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
+                          self.station_changes)
         self.model.setObjective(obj, GRB.MINIMIZE)
 
-        # 添加约束
+        # 添加流量平衡约束和特殊处理
         for i in self.G.nodes:
             for s in self.node_stations[i]:
                 # 计算流量
-                incoming_flow = gp.quicksum(self.paths[j, i, s] for j in self.G.predecessors(i) if (j, i, s) in self.paths)
-                outgoing_flow = gp.quicksum(self.paths[i, j, s] for j in self.G.successors(i) if (i, j, s) in self.paths)
+                incoming_flow = gp.quicksum(
+                    self.paths[j, i, s] for j in self.G.predecessors(i) if (j, i, s) in self.paths)
+                outgoing_flow = gp.quicksum(
+                    self.paths[i, j, s] for j in self.G.successors(i) if (i, j, s) in self.paths)
 
-                incoming_station_changes = gp.quicksum(self.station_changes[i, s2, s] for s2 in self.node_stations[i] if (i, s2, s) in self.station_changes)
-                outgoing_station_changes = gp.quicksum(self.station_changes[i, s, s2] for s2 in self.node_stations[i] if (i, s, s2) in self.station_changes)
+                # 处理站点转换
+                incoming_station_changes = gp.quicksum(self.station_changes[i, s2, s] for s2 in self.node_stations[i] if
+                                                       (i, s2, s) in self.station_changes)
+                outgoing_station_changes = gp.quicksum(self.station_changes[i, s, s2] for s2 in self.node_stations[i] if
+                                                       (i, s, s2) in self.station_changes)
 
                 incoming_flow += incoming_station_changes
                 outgoing_flow += outgoing_station_changes
@@ -212,7 +255,20 @@ class OptimizationProblem:
                     self.model.addConstr(incoming_flow == outgoing_flow, name=f"flow_balance_{i}_{s}")
 
         # 限制最大站点转换次数
-        self.model.addConstr(gp.quicksum(self.station_changes.values()) <= max_station_changes, name="max_station_changes")
+        self.model.addConstr(gp.quicksum(self.station_changes.values()) <= max_station_changes,
+                             name="max_station_changes")
+
+        # 删除能量传递和消耗的约束
+        # 先只保留路径选择后的能量初始化约束，调试是否有解
+        initial_energy = 100
+
+        for i, j in self.G.edges():
+            for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
+                # 如果选择了这条路径，能量从 0 变为 100
+                self.model.addConstr(
+                    self.energy_vars[i][s] >= self.paths[i, j, s] * initial_energy,
+                    name=f"EnergyInitialize_{i}_{j}_{s}"
+                )
 
     def solve(self):
         start_time = time.time()
@@ -285,7 +341,8 @@ class ShortestPathComputer:
             try:
                 shortest_path = nx.shortest_path(self.graph, source=start_node, target=station, weight='weight')
                 shortest_routes_start[station] = (
-                shortest_path, nx.shortest_path_length(self.graph, source=start_node, target=station, weight='weight'))
+                    shortest_path,
+                    nx.shortest_path_length(self.graph, source=start_node, target=station, weight='weight'))
             except nx.NetworkXNoPath:
                 pass
         return shortest_routes_start
@@ -312,7 +369,8 @@ class ShortestPathComputer:
             try:
                 shortest_path = nx.shortest_path(self.graph, source=station, target=dest_node, weight='weight')
                 shortest_routes_dest[station] = (
-                shortest_path, nx.shortest_path_length(self.graph, source=station, target=dest_node, weight='weight'))
+                    shortest_path,
+                    nx.shortest_path_length(self.graph, source=station, target=dest_node, weight='weight'))
             except nx.NetworkXNoPath:
                 pass
         return shortest_routes_dest
@@ -321,7 +379,8 @@ class ShortestPathComputer:
         try:
             shortest_path = nx.shortest_path(self.graph, source=start_node, target=dest_node, weight='weight')
             shortest_route_start_end = (
-            shortest_path, nx.shortest_path_length(self.graph, source=start_node, target=dest_node, weight='weight'))
+                shortest_path,
+                nx.shortest_path_length(self.graph, source=start_node, target=dest_node, weight='weight'))
             return shortest_route_start_end
         except nx.NetworkXNoPath:
             return None
@@ -613,6 +672,10 @@ original_G = graph_handler.get_graph()
 num_nodes = len(original_G.nodes)
 station_types = ['eb', 'es', 'ec', 'walk']
 node_stations = {i: station_types for i in original_G.nodes}
+start_node = '-375581293#1'
+end_node = '369977729#1'
+node_stations[start_node] = ['walk']
+node_stations[end_node] = ['walk']
 no_pref_nodes = 10
 max_station_changes = 5
 M = 1e6
@@ -621,7 +684,7 @@ M = 1e6
 
 
 # Generate preferred station types for each node (execute only once)
-preference_generator = PreferenceGenerator(original_G, station_types, no_pref_nodes)
+preference_generator = PreferenceGenerator(original_G, station_types)
 preferred_station, preferred_nodes = preference_generator.generate_node_preferences()
 
 # Compute shortest routes pairs (execute only once)
@@ -639,7 +702,7 @@ speed_dict = {entry['edge_id']: {'pedestrian_speed': float(entry['pedestrian_spe
               for entry in speed_data}
 
 # User preferences
-user_preference = ['eb', 'ec', 'es']  # This has to be Default - Remove any if not
+user_preference = ['eb', 'ec', 'es']
 
 # Prepare the output CSV file
 with open(output_csv_file, 'w', newline='') as csvfile:
@@ -680,11 +743,20 @@ with open(output_csv_file, 'w', newline='') as csvfile:
             optimization_problem.setup_model()
             optimization_problem.setup_decision_variables()
             optimization_problem.setup_costs()
+            optimization_problem.setup_energy_constraints(50)
             optimization_problem.setup_problem(start_node, 'walk', end_node, 'walk', max_station_changes)
 
             try:
                 # Solve the problem and measure execution time
                 prob, execution_time = optimization_problem.solve()
+
+                if optimization_problem.model.status == GRB.INFEASIBLE:
+                    print("Model is infeasible. Computing IIS...")
+                    optimization_problem.model.computeIIS()
+                    optimization_problem.model.write("model.ilp")
+                    print("IIS written to file 'model.ilp'")
+            except gp.GurobiError as e:
+                print(f"Gurobi Error: {e}")
 
                 if optimization_problem.model.status == GRB.OPTIMAL:
                     total_cost = optimization_problem.model.ObjVal

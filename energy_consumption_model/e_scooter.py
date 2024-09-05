@@ -6,7 +6,7 @@ class Escooter_PowerConsumptionCalculator:
         self.rho = rho  # Air density
         self.g = g  # Gravitational acceleration
 
-    def calculate(self, v, m, s):
+    def calculate(self, v, m):
         """
         v -- (Km/s)
         m -- (kg)

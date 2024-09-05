@@ -6,7 +6,7 @@ class Ebike_PowerConsumptionCalculator:
         self.rho = rho  # Air density
         self.g = g  # Gravitational acceleration
 
-    def calculate(self, v, m, s, pal):
+    def calculate(self, v, m, pal):
         """
         v -- (Km/s)
         m -- (kg)
