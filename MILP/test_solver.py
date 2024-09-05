@@ -10,6 +10,9 @@ import networkx as nx
 import re
 import json
 import csv
+import gurobipy as gp
+from gurobipy import GRB
+import time
 
 
 class GraphHandler:
@@ -110,6 +113,8 @@ class PreferenceGenerator:
         return preferred_station, preferred_nodes
 
 
+
+
 class OptimizationProblem:
     def __init__(self, G, node_stations, preferred_station, M, speed_dict, user_preference, congestion=1):
         self.G = G
@@ -119,24 +124,37 @@ class OptimizationProblem:
         self.speed_dict = speed_dict
         self.user_preference = user_preference
         self.congestion = congestion
-        self.paths = None
-        self.station_changes = None
-        self.costs = None
-        self.station_change_costs = None
-        self.prob = None
+        self.model = None
+        self.paths = {}
+        self.station_changes = {}
+        self.costs = {}
+        self.station_change_costs = {}
+
+    def setup_model(self):
+        # 初始化 Gurobi 模型
+        self.model = gp.Model("Minimize_Traversal_Cost")
+
 
     def setup_decision_variables(self):
-        self.paths = {(i, j, s): pulp.LpVariable(f"path_{i}_{j}_{s}", 0, 1, pulp.LpBinary)
-                      for i, j in self.G.edges()
-                      for s in set(self.node_stations[i]).intersection(self.node_stations[j])}
+        if self.model is None:
+            raise ValueError("Model is not initialized. Call setup_model() first.")
 
-        self.station_changes = {(i, s1, s2): pulp.LpVariable(f"station_change_{i}_{s1}_{s2}", 0, 1, pulp.LpBinary)
-                                for i in self.G.nodes
-                                for s1 in self.preferred_station[i]
-                                for s2 in self.preferred_station[i] if s1 != s2}
+        # 创建路径决策变量
+        for i, j in self.G.edges():
+            for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
+                var_name = f"path_{i}_{j}_{s}"
+                self.paths[i, j, s] = self.model.addVar(vtype=GRB.BINARY, name=var_name)
+
+        # 创建站点转换决策变量
+        for i in self.G.nodes:
+            for s1 in self.preferred_station[i]:
+                for s2 in self.preferred_station[i]:
+                    if s1 != s2:
+                        var_name = f"station_change_{i}_{s1}_{s2}"
+                        self.station_changes[i, s1, s2] = self.model.addVar(vtype=GRB.BINARY, name=var_name)
 
     def setup_costs(self):
-        self.costs = {}
+        # 设置路径的传输成本
         for i, j in self.G.edges():
             edge_weight = self.G[i][j]['weight']
             edge_id = i
@@ -144,27 +162,16 @@ class OptimizationProblem:
 
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
                 if s != 'walk':
-                    # if  s not in self.user_preference:
                     if s not in self.user_preference:
                         self.costs[i, j, s] = edge_weight * 1e7
                     else:
-                        if s == 'eb' or s == 'es':
-                            speed = speeds['bike_speed']
-                        elif s == 'ec':
-                            speed = speeds['car_speed']
-
-                        if speed == 0:
-                            self.costs[i, j, s] = 1e7  # float('inf')
-                        else:
-                            self.costs[i, j, s] = edge_weight / (speed)
+                        speed = speeds.get('bike_speed' if s in ['eb', 'es'] else 'car_speed', 0)
+                        self.costs[i, j, s] = edge_weight / speed if speed != 0 else 1e7
                 else:
-                    speed = speeds['pedestrian_speed']
-                    if speed == 0:
-                        self.costs[i, j, s] = 1e7  # float('inf')
-                    else:
-                        self.costs[i, j, s] = edge_weight / speed
+                    pedestrian_speed = speeds.get('pedestrian_speed', 0)
+                    self.costs[i, j, s] = edge_weight / pedestrian_speed if pedestrian_speed != 0 else 1e7
 
-        self.station_change_costs = {}
+        # 设置站点转换的成本
         for i in self.G.nodes:
             if len(self.preferred_station[i]) > 1:
                 for s1 in self.preferred_station[i]:
@@ -175,54 +182,61 @@ class OptimizationProblem:
                             self.station_change_costs[i, s1, s2] = self.M
 
     def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes):
-        self.prob = pulp.LpProblem("Minimize_Traversal_Cost", pulp.LpMinimize)
-        self.prob += pulp.lpSum([self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths]) + \
-                     pulp.lpSum([self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
-                                 self.station_changes])
 
+        # 设置目标函数
+        obj = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
+              gp.quicksum(self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in self.station_changes)
+        self.model.setObjective(obj, GRB.MINIMIZE)
+
+        # 添加约束
         for i in self.G.nodes:
-            for s in station_types:
-                if s in self.node_stations[i]:
-                    incoming_flow = pulp.lpSum(
-                        [self.paths[j, i, s] for j in self.G.predecessors(i) if (j, i, s) in self.paths])
-                    outgoing_flow = pulp.lpSum(
-                        [self.paths[i, j, s] for j in self.G.successors(i) if (i, j, s) in self.paths])
+            for s in self.node_stations[i]:
+                # 计算流量
+                incoming_flow = gp.quicksum(self.paths[j, i, s] for j in self.G.predecessors(i) if (j, i, s) in self.paths)
+                outgoing_flow = gp.quicksum(self.paths[i, j, s] for j in self.G.successors(i) if (i, j, s) in self.paths)
 
-                    incoming_station_changes = pulp.lpSum(
-                        [self.station_changes[i, s2, s] for s2 in self.node_stations[i] if
-                         (i, s2, s) in self.station_changes])
-                    outgoing_station_changes = pulp.lpSum(
-                        [self.station_changes[i, s, s2] for s2 in self.node_stations[i] if
-                         (i, s, s2) in self.station_changes])
+                incoming_station_changes = gp.quicksum(self.station_changes[i, s2, s] for s2 in self.node_stations[i] if (i, s2, s) in self.station_changes)
+                outgoing_station_changes = gp.quicksum(self.station_changes[i, s, s2] for s2 in self.node_stations[i] if (i, s, s2) in self.station_changes)
 
-                    incoming_flow += incoming_station_changes
-                    outgoing_flow += outgoing_station_changes
+                incoming_flow += incoming_station_changes
+                outgoing_flow += outgoing_station_changes
 
-                    if i == start_node and s == start_station:
-                        self.prob += outgoing_flow == 1
-                        self.prob += incoming_flow == 0
-                    elif i == end_node and s == end_station:
-                        self.prob += incoming_flow == 1
-                        self.prob += outgoing_flow == 0
-                    else:
-                        self.prob += incoming_flow == outgoing_flow
+                # 起点和终点的特殊处理
+                if i == start_node and s == start_station:
+                    self.model.addConstr(outgoing_flow == 1, name=f"start_outflow_{i}_{s}")
+                    self.model.addConstr(incoming_flow == 0, name=f"start_inflow_{i}_{s}")
+                elif i == end_node and s == end_station:
+                    self.model.addConstr(incoming_flow == 1, name=f"end_inflow_{i}_{s}")
+                    self.model.addConstr(outgoing_flow == 0, name=f"end_outflow_{i}_{s}")
+                else:
+                    self.model.addConstr(incoming_flow == outgoing_flow, name=f"flow_balance_{i}_{s}")
 
-        self.prob += pulp.lpSum(self.station_changes.values()) <= max_station_changes
+        # 限制最大站点转换次数
+        self.model.addConstr(gp.quicksum(self.station_changes.values()) <= max_station_changes, name="max_station_changes")
 
     def solve(self):
         start_time = time.time()
-        self.prob.solve(pulp.GUROBI_CMD(msg=False))
-        # self.prob.solve(pulp.PULP_CBC_CMD(msg=False))
+        self.model.optimize()  # 使用 Gurobi 求解
         end_time = time.time()
-        return self.prob, end_time - start_time
+
+        if self.model.status == GRB.OPTIMAL:
+            print("Optimal solution found.")
+        elif self.model.status == GRB.INFEASIBLE:
+            print("Model is infeasible.")
+        elif self.model.status == GRB.UNBOUNDED:
+            print("Model is unbounded.")
+        else:
+            print(f"Optimization ended with status {self.model.status}")
+
+        return self.model, end_time - start_time
 
 
 class PathFinder:
     def __init__(self, paths, station_changes, costs, station_change_costs):
-        self.paths = paths
-        self.station_changes = station_changes
-        self.costs = costs
-        self.station_change_costs = station_change_costs
+        self.paths = paths  # Gurobi decision variables for paths
+        self.station_changes = station_changes  # Gurobi decision variables for station changes
+        self.costs = costs  # Costs associated with paths
+        self.station_change_costs = station_change_costs  # Costs associated with station changes
 
     def generate_path_sequence(self, start_node, start_station, end_node, end_station):
         current_node, current_mode = start_node, start_station
@@ -232,22 +246,26 @@ class PathFinder:
 
         while not destination_reached:
             next_step_found = False
-            for i, j, s in self.paths:
-                if i == current_node and s == current_mode and pulp.value(self.paths[i, j, s]) == 1:
+
+            # Look for the next path step
+            for (i, j, s) in self.paths:
+                if i == current_node and s == current_mode and self.paths[i, j, s].X == 1:
                     path_cost = self.costs[i, j, s]
                     path_sequence.append((i, j, s, path_cost))
                     current_node = j
                     next_step_found = True
                     break
 
-            for i, s1, s2 in self.station_changes:
-                if i == current_node and s1 == current_mode and pulp.value(self.station_changes[i, s1, s2]) == 1:
+            # Look for the next station change
+            for (i, s1, s2) in self.station_changes:
+                if i == current_node and s1 == current_mode and self.station_changes[i, s1, s2].X == 1:
                     mode_change_cost = self.station_change_costs[i, s1, s2]
                     path_sequence.append((i, s1, s2, mode_change_cost))
                     current_mode = s2
                     station_change_count += 1
                     next_step_found = True
 
+            # Check if destination is reached
             if current_node == end_node and current_mode == end_station:
                 destination_reached = True
             elif not next_step_found:
@@ -443,25 +461,6 @@ class RouteFinder:
         self.graph = graph
         self.speed_dict = speed_dict
 
-        # edge_id = i
-        # speeds = self.speed_dict[edge_id]
-
-        # for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
-        #     if s != 'walk':
-        #         # if  s not in self.user_preference:
-        #         if s not in self.user_preference:
-        #             self.costs[i, j, s] = edge_weight * 1e7
-        #         else:
-        #             if s == 'eb' or s == 'es':
-        #                 speed = speeds['bike_speed']
-        #             elif s == 'ec':
-        #                 speed = speeds['car_speed']
-
-        #             if speed == 0:
-        #                 self.costs[i, j, s] = 1e7#float('inf')
-        #             else:
-        #                 self.costs[i, j, s] = edge_weight / (speed)
-
     def get_route_with_weights_start(self, start_node, shortest_routes_start, target_node, mode):
         if target_node not in shortest_routes_start:
             print(f"No route found from {start_node} to {target_node}")
@@ -594,94 +593,6 @@ class RouteFinder:
         return complete_route_with_weights
 
 
-######################*Original Main for Single Pair*********************
-##########################################################################
-# Main code
-# file_path = 'DCC.net.xml'
-# speed_file_path = 'query_results-0.json'
-
-# # Create graph from XML file
-# graph_handler = GraphHandler(file_path)
-# original_G = graph_handler.get_graph()
-
-# # Define parameters
-# num_nodes = len(original_G.nodes)
-# station_types = ['eb', 'es', 'ec', 'walk']
-# node_stations = {i: station_types for i in original_G.nodes}
-# no_pref_nodes = 10
-# max_station_changes = 5
-# start_node = '-317554422' #'129211824'
-# start_station = 'walk'
-# end_node = '666320561#0'   #'25356998'
-# end_station = 'walk'
-# M = 1e6
-
-
-# # Generate prelferred station types for each node
-# preference_generator = PreferenceGenerator(original_G, station_types, no_pref_nodes)
-# preferred_station, preferred_nodes = preference_generator.generate_node_preferences()
-
-# # Compute shortest routes
-# shortest_path_computer = ShortestPathComputer(original_G)
-# shortest_routes_start = shortest_path_computer.compute_shortest_paths_start(start_node, preferred_nodes)
-# all_shortest_routes_pairs = shortest_path_computer.compute_shortest_paths_pairs(preferred_nodes)
-# shortest_routes_dest = shortest_path_computer.compute_shortest_paths_dest(end_node, preferred_nodes)
-# shortest_route_start_end = shortest_path_computer.compute_shortest_path_start_end(start_node,end_node)
-
-
-# # Create a new reduced graph
-# reduced_graph_creator = ReducedGraphCreator(original_G, start_node, end_node, preferred_nodes, shortest_routes_start, shortest_routes_dest, all_shortest_routes_pairs, shortest_route_start_end)
-# reduced_G = reduced_graph_creator.create_new_graph()
-
-# # Load speed data from JSON
-# with open(speed_file_path, 'r') as f:
-#     speed_data = json.load(f)
-
-# # Create a dictionary for speed data
-# speed_dict = {entry['edge_id']: {'pedestrian_speed': float(entry['pedestrian_speed']),
-#                                  'bike_speed': float(entry['bike_speed']),
-#                                  'car_speed': float(entry['car_speed'])}
-#               for entry in speed_data}
-
-# # User preferences
-# user_preference = ['eb', 'ec', 'es']
-
-# # Set up and solve the optimization problem
-# optimization_problem = OptimizationProblem(reduced_G, node_stations, preferred_station, M, speed_dict, user_preference)
-# optimization_problem.setup_decision_variables()
-# optimization_problem.setup_costs()
-# optimization_problem.setup_problem(start_node, start_station, end_node, end_station, max_station_changes)
-
-# # Solve the problem and measure execution time
-# prob, execution_time = optimization_problem.solve()
-
-# # Generate path sequence and output resultsq
-# if pulp.LpStatus[prob.status] == 'Optimal':
-#     print("Total Cost: ", pulp.value(prob.objective))
-
-#     path_finder = PathFinder(optimization_problem.paths, optimization_problem.station_changes, optimization_problem.costs,
-#                              optimization_problem.station_change_costs)
-#     path_sequence, station_change_count = path_finder.generate_path_sequence(start_node, start_station, end_node, end_station)
-
-#     print("Optimal Path from Reduced Graph:", path_sequence)
-#     print("Total Number of Station Changes:", station_change_count)
-# else:
-#     print("No optimal solution found.")
-
-# print("Execution time: {:.2f} seconds".format(execution_time))
-
-# # Instantiate the class with the required data
-# route_with_weights_handler = RouteFinder(
-#     original_G
-#     ,speed_dict
-# )
-
-# # Get the complete route with weights
-# complete_route_with_weights = route_with_weights_handler.get_complete_route_with_weights(path_sequence,shortest_routes_start,shortest_routes_dest,all_shortest_routes_pairs,shortest_route_start_end)
-# #Output
-# print("Mapped Path to original Graph with speeds:", complete_route_with_weights)
-
-
 ######################O*****************Original END *********************
 ##########################################################################
 
@@ -766,6 +677,7 @@ with open(output_csv_file, 'w', newline='') as csvfile:
             # Set up and solve the optimization problem
             optimization_problem = OptimizationProblem(reduced_G, node_stations, preferred_station, M, speed_dict,
                                                        user_preference)
+            optimization_problem.setup_model()
             optimization_problem.setup_decision_variables()
             optimization_problem.setup_costs()
             optimization_problem.setup_problem(start_node, 'walk', end_node, 'walk', max_station_changes)
@@ -774,8 +686,9 @@ with open(output_csv_file, 'w', newline='') as csvfile:
                 # Solve the problem and measure execution time
                 prob, execution_time = optimization_problem.solve()
 
-                if pulp.LpStatus[prob.status] == 'Optimal':
-                    total_cost = pulp.value(prob.objective)
+                if optimization_problem.model.status == GRB.OPTIMAL:
+                    total_cost = optimization_problem.model.ObjVal
+                    # total_cost = pulp.value(prob.objective)
 
                     path_finder = PathFinder(optimization_problem.paths, optimization_problem.station_changes,
                                              optimization_problem.costs,
