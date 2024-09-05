@@ -8,8 +8,8 @@ class ECar_EnergyConsumptionModel:
         self.Paer = np.random.normal(3.12e-5)
         # parameter for rolling resistance with different passengers
         self.Ptir = 0.05 / 1235 * (1235 + numb * 80)
-        # random power loading for ancillary services [0.2, 2.2]
-        self.Panc = 0.2 + random.random() * 2
+        # random power loading for ancillary services [0.5, 1.5] (更窄的范围避免极端)
+        self.Panc = 0.5 + random.random() * 1
 
         # coefficients for the energy loss polynomial
         self.Pa = self.Paer + 4e-6  # x^2 term coefficient
@@ -18,13 +18,18 @@ class ECar_EnergyConsumptionModel:
         self.Pd = 0.375 + self.Panc  # x^(-1) term coefficient
 
     def calculate_energy_loss(self, speed):
+        # 防止速度接近 0 导致无穷大，设定最小速度阈值
+        if speed < 1:
+            speed = 1
+
         # Calculate energy loss
         energy_loss = (self.Pa * speed ** 2 + self.Pb * speed + self.Pc + self.Pd / speed) * 1000 / speed
-        return energy_loss
+
+        # 防止能量损失为负值，最小设定为 0
+        return max(energy_loss, 0)
 
 
-# Example
-# Suppose we have an agent with 4 passengers
+# Example usage
 num_passengers = 4
 vehicle = ECar_EnergyConsumptionModel(num_passengers)
 
@@ -33,3 +38,4 @@ vehicle_speed = 100
 
 # Calculate energy loss
 energy_loss = vehicle.calculate_energy_loss(vehicle_speed)
+print(f"Energy loss: {energy_loss} Wh/km")

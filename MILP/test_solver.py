@@ -258,17 +258,35 @@ class OptimizationProblem:
         self.model.addConstr(gp.quicksum(self.station_changes.values()) <= max_station_changes,
                              name="max_station_changes")
 
-        # 删除能量传递和消耗的约束
-        # 先只保留路径选择后的能量初始化约束，调试是否有解
-        initial_energy = 100
+        initial_energy = 100  # 设备切换后的初始能量
 
         for i, j in self.G.edges():
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
-                # 如果选择了这条路径，能量从 0 变为 100
+                energy_consumption = self.energy_constraints[i, j, s]
+                print(energy_consumption)
+
+                # 确保只有当能量足够时，才能选择这条路径
                 self.model.addConstr(
-                    self.energy_vars[i][s] >= self.paths[i, j, s] * initial_energy,
-                    name=f"EnergyInitialize_{i}_{j}_{s}"
+                    self.paths[i, j, s] * energy_consumption <= self.energy_vars[i][s],
+                    name=f"PathEnergyFeasibility_{i}_{j}_{s}"
                 )
+
+                # 能量从 i 到 j 消耗
+                self.model.addConstr(
+                    self.energy_vars[j][s] >= self.energy_vars[i][s] - energy_consumption * self.paths[i, j, s],
+                    name=f"EnergyConsumption_{i}_{j}_{s}"
+                )
+
+        # 添加站点转换时的能量重置逻辑
+        for i in self.G.nodes:
+            for s1 in self.node_stations[i]:
+                for s2 in self.node_stations[i]:
+                    if s1 != s2:
+                        # 如果发生了站点转换，新的交通工具的能量重置为 100
+                        self.model.addConstr(
+                            self.energy_vars[i][s2] >= self.station_changes[i, s1, s2] * initial_energy,
+                            name=f"EnergyReset_{i}_{s1}_{s2}"
+                        )
 
     def solve(self):
         start_time = time.time()
@@ -750,13 +768,13 @@ with open(output_csv_file, 'w', newline='') as csvfile:
                 # Solve the problem and measure execution time
                 prob, execution_time = optimization_problem.solve()
 
-                if optimization_problem.model.status == GRB.INFEASIBLE:
-                    print("Model is infeasible. Computing IIS...")
-                    optimization_problem.model.computeIIS()
-                    optimization_problem.model.write("model.ilp")
-                    print("IIS written to file 'model.ilp'")
-            except gp.GurobiError as e:
-                print(f"Gurobi Error: {e}")
+            #     if optimization_problem.model.status == GRB.INFEASIBLE:
+            #         print("Model is infeasible. Computing IIS...")
+            #         optimization_problem.model.computeIIS()
+            #         optimization_problem.model.write("model.ilp")
+            #         print("IIS written to file 'model.ilp'")
+            # except gp.GurobiError as e:
+            #     print(f"Gurobi Error: {e}")
 
                 if optimization_problem.model.status == GRB.OPTIMAL:
                     total_cost = optimization_problem.model.ObjVal
