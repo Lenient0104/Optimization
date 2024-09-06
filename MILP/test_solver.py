@@ -156,14 +156,14 @@ class OptimizationProblem:
                         self.station_changes[i, s1, s2] = self.model.addVar(vtype=GRB.BINARY, name=var_name)
 
         # 初始化每个节点上每个交通工具的能量变量
+        initial_energy = 50  # 设定初始能量
         for i in self.G.nodes:
-            self.energy_vars[i] = {}  # 初始化每个节点的子字典
-            for s in self.node_stations[i]:  # 遍历每个节点的交通工具
+            self.energy_vars[i] = {}
+            for s in self.node_stations[i]:
                 var_name = f"energy_{i}_{s}"
-                self.energy_vars[i][s] = self.model.addVar(
-                    vtype=GRB.CONTINUOUS,
-                    name=var_name
-                )
+                self.energy_vars[i][s] = self.model.addVar(vtype=GRB.CONTINUOUS, name=var_name)
+                # 赋初值
+                self.model.addConstr(self.energy_vars[i][s] == initial_energy, name=f"InitialEnergy_{i}_{s}")
 
     def setup_costs(self):
         # 设置路径的传输成本
@@ -214,7 +214,7 @@ class OptimizationProblem:
                         self.energy_constraints[i, j, s] = ecar_calculator.calculate_energy_loss(
                             speeds['car_speed'])
                         if self.energy_constraints[i, j, s] == 0:
-                            self.energy_constraints[i, j, s] = 50
+                            self.energy_constraints[i, j, s] = 60
                 else:
                     self.energy_constraints[i, j, s] = 0
         test = self.energy_constraints['-13904652', '41502636#0', 'ec']
@@ -260,37 +260,36 @@ class OptimizationProblem:
         self.model.addConstr(gp.quicksum(self.station_changes.values()) <= max_station_changes,
                              name="max_station_changes")
 
-        initial_energy = 50  # 设备切换后的初始能量
-
-        # 添加站点转换时的能量重置逻辑
-        for i in self.G.nodes:
-            for s1 in self.node_stations[i]:
-                for s2 in self.node_stations[i]:
-                    if s1 != s2:
-                        # 如果发生了站点转换，新的交通工具的能量重置为 50
-                        self.model.addConstr(
-                            self.energy_vars[i][s2] >= self.station_changes[i, s1, s2] * initial_energy,
-                            name=f"EnergyReset_{i}_{s1}_{s2}"
-                        )
-
+        # 添加能量约束
         for i, j in self.G.edges():
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
                 energy_consumption = self.energy_constraints[i, j, s]
-                print(s, energy_consumption)
 
-                # 确保只有当能量足够时，才能选择这条路径
+                # 添加能量约束：路径只能在能量足够时选择
                 self.model.addConstr(
                     self.paths[i, j, s] * energy_consumption <= self.energy_vars[i][s],
                     name=f"PathEnergyFeasibility_{i}_{j}_{s}"
                 )
+                print(self.energy_vars[i][s])
 
-                # 能量从 i 到 j 消耗
+                # 能量递减约束
                 self.model.addConstr(
                     self.energy_vars[j][s] >= self.energy_vars[i][s] - energy_consumption * self.paths[i, j, s],
                     name=f"EnergyConsumption_{i}_{j}_{s}"
                 )
+                self.model.update()
+                print(self.energy_vars[i][s])
 
-
+        # 添加站点转换时的能量重置逻辑
+        initial_energy = 50
+        for i in self.G.nodes:
+            for s1 in self.node_stations[i]:
+                for s2 in self.node_stations[i]:
+                    if s1 != s2:
+                        self.model.addConstr(
+                            self.energy_vars[i][s2] >= self.station_changes[i, s1, s2] * initial_energy,
+                            name=f"EnergyReset_{i}_{s1}_{s2}"
+                        )
 
     def solve(self):
         start_time = time.time()
@@ -310,12 +309,12 @@ class OptimizationProblem:
 
 
 class PathFinder:
-    def __init__(self, paths, station_changes, costs, station_change_costs):
+    def __init__(self, paths, station_changes, costs, station_change_costs, energy_constraints):
         self.paths = paths  # Gurobi decision variables for paths
         self.station_changes = station_changes  # Gurobi decision variables for station changes
         self.costs = costs  # Costs associated with paths
         self.station_change_costs = station_change_costs  # Costs associated with station changes
-        # self.energy_constraints = energy_constraints
+        self.energy_constraints = energy_constraints
 
     def generate_path_sequence(self, start_node, start_station, end_node, end_station):
         current_node, current_mode = start_node, start_station
@@ -331,7 +330,9 @@ class PathFinder:
             for (i, j, s) in self.paths:
                 if i == current_node and s == current_mode and self.paths[i, j, s].X == 1:
                     path_cost = self.costs[i, j, s]
-                    path_sequence.append((i, j, s, path_cost))
+                    energy_consumption = self.energy_constraints[i, j, s]
+                    path_sequence.append((i, j, s, path_cost, energy_consumption))
+                    energy_consumption_sequence.append((i, j, s, energy_consumption))
                     current_node = j
                     next_step_found = True
                     break
@@ -773,6 +774,7 @@ with open(output_csv_file, 'w', newline='') as csvfile:
             try:
                 # Solve the problem and measure execution time
                 prob, execution_time = optimization_problem.solve()
+                optimization_problem.model.write("mymodel.lp")
 
                 #     if optimization_problem.model.status == GRB.INFEASIBLE:
                 #         print("Model is infeasible. Computing IIS...")
@@ -788,7 +790,7 @@ with open(output_csv_file, 'w', newline='') as csvfile:
 
                     path_finder = PathFinder(optimization_problem.paths, optimization_problem.station_changes,
                                              optimization_problem.costs,
-                                             optimization_problem.station_change_costs)
+                                             optimization_problem.station_change_costs, optimization_problem.energy_constraints)
                     path_sequence, station_change_count = path_finder.generate_path_sequence(start_node, 'walk',
                                                                                              end_node, 'walk')
 
