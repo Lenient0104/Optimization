@@ -628,7 +628,7 @@ class RouteFinder:
 file_path = 'DCC.net.xml'
 speed_file_path = 'query_results-0.json'
 od_pairs_file = 'od_pairs.csv'  # Path to the CSV file containing OD pairs
-output_csv_file = 'RG_TimeTest_50_Nodes.csv'  # Output CSV file to store the results
+output_csv_file = 'RG_TimeTest_50_Nodes_0906.csv'  # Output CSV file to store the results
 
 # Create graph from XML file
 graph_handler = GraphHandler(file_path)

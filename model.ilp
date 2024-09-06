@@ -1,0 +1,116 @@
+\ Model Minimize_Traversal_Cost_copy
+\ LP format - for model browsing. Use MPS format to capture full model detail.
+Minimize
+ 
+Subject To
+ end_inflow_369977729#1_walk: path_-375581293#1_369977729#1_walk
+   + path_361409608#3_369977729#1_walk + path_3791905#2_369977729#1_walk
+   + path_-11685016#2_369977729#1_walk + path_369154722#2_369977729#1_walk
+   + path_244844370#0_369977729#1_walk + path_37721356#0_369977729#1_walk
+   + path_74233405#1_369977729#1_walk + path_129774671#0_369977729#1_walk
+   + path_23395388#5_369977729#1_walk + path_-64270141_369977729#1_walk
+   + path_18927706#0_369977729#1_walk + path_-42471880_369977729#1_walk
+   + path_67138626#1_369977729#1_walk + path_41502636#0_369977729#1_walk
+   + path_-75450412_369977729#1_walk + path_-23347664#1_369977729#1_walk
+   + path_14151839#3_369977729#1_walk + path_-12341242#1_369977729#1_walk
+   + path_-13904652_369977729#1_walk + path_-47638297#3_369977729#1_walk
+   = 1
+ InitialEnergy_-375581293#1_walk: energy_-375581293#1_walk = 0
+ InitialEnergy_361409608#3_walk: energy_361409608#3_walk = 0
+ InitialEnergy_3791905#2_walk: energy_3791905#2_walk = 0
+ InitialEnergy_-11685016#2_walk: energy_-11685016#2_walk = 0
+ InitialEnergy_369154722#2_walk: energy_369154722#2_walk = 0
+ InitialEnergy_244844370#0_walk: energy_244844370#0_walk = 0
+ InitialEnergy_37721356#0_walk: energy_37721356#0_walk = 0
+ InitialEnergy_74233405#1_walk: energy_74233405#1_walk = 0
+ InitialEnergy_129774671#0_walk: energy_129774671#0_walk = 0
+ InitialEnergy_23395388#5_walk: energy_23395388#5_walk = 0
+ InitialEnergy_-64270141_walk: energy_-64270141_walk = 0
+ InitialEnergy_18927706#0_walk: energy_18927706#0_walk = 0
+ InitialEnergy_-42471880_walk: energy_-42471880_walk = 0
+ InitialEnergy_67138626#1_walk: energy_67138626#1_walk = 0
+ InitialEnergy_41502636#0_walk: energy_41502636#0_walk = 0
+ InitialEnergy_-75450412_walk: energy_-75450412_walk = 0
+ InitialEnergy_-23347664#1_walk: energy_-23347664#1_walk = 0
+ InitialEnergy_14151839#3_walk: energy_14151839#3_walk = 0
+ InitialEnergy_-12341242#1_walk: energy_-12341242#1_walk = 0
+ InitialEnergy_-13904652_walk: energy_-13904652_walk = 0
+ InitialEnergy_-47638297#3_walk: energy_-47638297#3_walk = 0
+ EnergyInitialize_-375581293#1_369977729#1_walk:
+   - 100 path_-375581293#1_369977729#1_walk + energy_-375581293#1_walk
+   >= 0
+ EnergyInitialize_361409608#3_369977729#1_walk:
+   - 100 path_361409608#3_369977729#1_walk + energy_361409608#3_walk >= 0
+ EnergyInitialize_3791905#2_369977729#1_walk:
+   - 100 path_3791905#2_369977729#1_walk + energy_3791905#2_walk >= 0
+ EnergyInitialize_-11685016#2_369977729#1_walk:
+   - 100 path_-11685016#2_369977729#1_walk + energy_-11685016#2_walk >= 0
+ EnergyInitialize_369154722#2_369977729#1_walk:
+   - 100 path_369154722#2_369977729#1_walk + energy_369154722#2_walk >= 0
+ EnergyInitialize_244844370#0_369977729#1_walk:
+   - 100 path_244844370#0_369977729#1_walk + energy_244844370#0_walk >= 0
+ EnergyInitialize_37721356#0_369977729#1_walk:
+   - 100 path_37721356#0_369977729#1_walk + energy_37721356#0_walk >= 0
+ EnergyInitialize_74233405#1_369977729#1_walk:
+   - 100 path_74233405#1_369977729#1_walk + energy_74233405#1_walk >= 0
+ EnergyInitialize_129774671#0_369977729#1_walk:
+   - 100 path_129774671#0_369977729#1_walk + energy_129774671#0_walk >= 0
+ EnergyInitialize_23395388#5_369977729#1_walk:
+   - 100 path_23395388#5_369977729#1_walk + energy_23395388#5_walk >= 0
+ EnergyInitialize_-64270141_369977729#1_walk:
+   - 100 path_-64270141_369977729#1_walk + energy_-64270141_walk >= 0
+ EnergyInitialize_18927706#0_369977729#1_walk:
+   - 100 path_18927706#0_369977729#1_walk + energy_18927706#0_walk >= 0
+ EnergyInitialize_-42471880_369977729#1_walk:
+   - 100 path_-42471880_369977729#1_walk + energy_-42471880_walk >= 0
+ EnergyInitialize_67138626#1_369977729#1_walk:
+   - 100 path_67138626#1_369977729#1_walk + energy_67138626#1_walk >= 0
+ EnergyInitialize_41502636#0_369977729#1_walk:
+   - 100 path_41502636#0_369977729#1_walk + energy_41502636#0_walk >= 0
+ EnergyInitialize_-75450412_369977729#1_walk:
+   - 100 path_-75450412_369977729#1_walk + energy_-75450412_walk >= 0
+ EnergyInitialize_-23347664#1_369977729#1_walk:
+   - 100 path_-23347664#1_369977729#1_walk + energy_-23347664#1_walk >= 0
+ EnergyInitialize_14151839#3_369977729#1_walk:
+   - 100 path_14151839#3_369977729#1_walk + energy_14151839#3_walk >= 0
+ EnergyInitialize_-12341242#1_369977729#1_walk:
+   - 100 path_-12341242#1_369977729#1_walk + energy_-12341242#1_walk >= 0
+ EnergyInitialize_-13904652_369977729#1_walk:
+   - 100 path_-13904652_369977729#1_walk + energy_-13904652_walk >= 0
+ EnergyInitialize_-47638297#3_369977729#1_walk:
+   - 100 path_-47638297#3_369977729#1_walk + energy_-47638297#3_walk >= 0
+Bounds
+ energy_-375581293#1_walk free
+ energy_361409608#3_walk free
+ energy_3791905#2_walk free
+ energy_-11685016#2_walk free
+ energy_369154722#2_walk free
+ energy_244844370#0_walk free
+ energy_37721356#0_walk free
+ energy_74233405#1_walk free
+ energy_129774671#0_walk free
+ energy_23395388#5_walk free
+ energy_-64270141_walk free
+ energy_18927706#0_walk free
+ energy_-42471880_walk free
+ energy_67138626#1_walk free
+ energy_41502636#0_walk free
+ energy_-75450412_walk free
+ energy_-23347664#1_walk free
+ energy_14151839#3_walk free
+ energy_-12341242#1_walk free
+ energy_-13904652_walk free
+ energy_-47638297#3_walk free
+Binaries
+ path_-375581293#1_369977729#1_walk path_361409608#3_369977729#1_walk
+ path_3791905#2_369977729#1_walk path_-11685016#2_369977729#1_walk
+ path_369154722#2_369977729#1_walk path_244844370#0_369977729#1_walk
+ path_37721356#0_369977729#1_walk path_74233405#1_369977729#1_walk
+ path_129774671#0_369977729#1_walk path_23395388#5_369977729#1_walk
+ path_-64270141_369977729#1_walk path_18927706#0_369977729#1_walk
+ path_-42471880_369977729#1_walk path_67138626#1_369977729#1_walk
+ path_41502636#0_369977729#1_walk path_-75450412_369977729#1_walk
+ path_-23347664#1_369977729#1_walk path_14151839#3_369977729#1_walk
+ path_-12341242#1_369977729#1_walk path_-13904652_369977729#1_walk
+ path_-47638297#3_369977729#1_walk
+End

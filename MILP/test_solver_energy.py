@@ -164,7 +164,7 @@ class OptimizationProblem:
         initial_energy = {  # in wh
             'eb': 50,
             'es': 35,
-            'ec': 3000,
+            'ec': 1500,
             'walk': 0
         }
         for i in self.G.nodes:
@@ -671,7 +671,7 @@ class RouteFinder:
 file_path = "/Users/dingyue/Documents/Optimization_new/MILP/DCC.net.xml"
 speed_file_path = '/Users/dingyue/Documents/Optimization_new/MILP/query_results-0.json'
 od_pairs_file = '/Users/dingyue/Documents/Optimization_new/MILP/od_pairs.csv'  # Path to the CSV file containing OD pairs
-output_csv_file = 'RG_TimeTest_50_Nodes.csv'  # Output CSV file to store the results
+output_csv_file = 'RG_TimeTest_50_Nodes_0906.csv'  # Output CSV file to store the results
 
 # Create graph from XML file
 graph_handler = GraphHandler(file_path)
@@ -681,10 +681,9 @@ original_G = graph_handler.get_graph()
 num_nodes = len(original_G.nodes)
 station_types = ['eb', 'es', 'ec', 'walk']
 node_stations = {i: station_types for i in original_G.nodes}
-start_node = '-375581293#1'
-end_node = '369977729#1'
-node_stations[start_node] = ['walk']
-node_stations[end_node] = ['walk']
+# start_node = '-375581293#1'
+# end_node = '369977729#1'
+
 no_pref_nodes = 10
 max_station_changes = 5
 M = 1e6
@@ -728,6 +727,9 @@ with open(output_csv_file, 'w', newline='') as csvfile:
             initial_time = time.time()
 
             start_node, end_node = row  # Extract start_node and end_node from the current row
+
+            node_stations[start_node] = ['walk']
+            node_stations[end_node] = ['walk']
 
             # Compute shortest route pairs for testing only - otherwise outside the loop
             all_shortest_routes_pairs = shortest_path_computer.compute_shortest_paths_pairs(preferred_nodes)

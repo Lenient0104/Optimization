@@ -219,6 +219,7 @@ class OptimizationProblem:
                             speeds['car_speed'])
                         if self.energy_constraints[i, j, s] == 0:
                             self.energy_constraints[i, j, s] = 60
+
                 else:
                     self.energy_constraints[i, j, s] = 0
         test = self.energy_constraints['-13904652', '41502636#0', 'ec']
@@ -682,7 +683,7 @@ class RouteFinder:
 file_path = "/Users/dingyue/Documents/Optimization_new/MILP/DCC.net.xml"
 speed_file_path = '/Users/dingyue/Documents/Optimization_new/MILP/query_results-0.json'
 od_pairs_file = '/Users/dingyue/Documents/Optimization_new/MILP/od_pairs.csv'  # Path to the CSV file containing OD pairs
-output_csv_file = 'RG_TimeTest_50_Nodes.csv'  # Output CSV file to store the results
+output_csv_file = 'RG_TimeTest_50_Nodes_0906.csv'  # Output CSV file to store the results
 
 # Create graph from XML file
 graph_handler = GraphHandler(file_path)

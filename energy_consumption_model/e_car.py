@@ -10,7 +10,8 @@ class ECar_EnergyConsumptionModel:
         self.Ptir = 0.05 / 1235 * (1235 + numb * 80)
         # random power loading for ancillary services [0.5, 1.5] (更窄的范围避免极端)
         self.Panc = 0.5 + random.random() * 1
-
+        if self.Paer < 0:
+            self.Paer = 0
         # coefficients for the energy loss polynomial
         self.Pa = self.Paer + 4e-6  # x^2 term coefficient
         self.Pb = 5e-4  # x term coefficient
@@ -18,10 +19,6 @@ class ECar_EnergyConsumptionModel:
         self.Pd = 0.375 + self.Panc  # x^(-1) term coefficient
 
     def calculate_energy_loss(self, speed):
-        # 防止速度接近 0 导致无穷大，设定最小速度阈值
-        if speed < 1:
-            speed = 1
-
         # Calculate energy loss
         energy_loss = (self.Pa * speed ** 2 + self.Pb * speed + self.Pc + self.Pd / speed) * 1000 / speed
 
