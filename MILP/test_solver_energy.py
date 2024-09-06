@@ -162,8 +162,8 @@ class OptimizationProblem:
                         self.station_changes[i, s1, s2] = self.model.addVar(vtype=GRB.BINARY, name=var_name)
 
         initial_energy = {  # in wh
-            'eb': 50,
-            'es': 35,
+            'eb': 100000000000,
+            'es': 1000,
             'ec': 1500,
             'walk': 0
         }
@@ -189,7 +189,7 @@ class OptimizationProblem:
                         self.costs[i, j, s] = edge_weight / speed if speed != 0 else 1e7
                 else:
                     pedestrian_speed = speeds.get('pedestrian_speed', 0)
-                    self.costs[i, j, s] = edge_weight / pedestrian_speed if pedestrian_speed != 0 else 1e7
+                    self.costs[i, j, s] = edge_weight  / pedestrian_speed if pedestrian_speed != 0 else 1e7
 
         for i in self.G.nodes:
             if len(self.preferred_station[i]) > 1:
@@ -216,13 +216,16 @@ class OptimizationProblem:
                 self.energy_constraints[i, j, s] = self.calculate_energy(s, edge_weight)
 
     def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes):
+        # 设置目标函数
         obj = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
               gp.quicksum(self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
                           self.station_changes)
         self.model.setObjective(obj, GRB.MINIMIZE)
 
+        # 添加流量平衡约束和特殊处理
         for i in self.G.nodes:
             for s in self.node_stations[i]:
+                # 计算流量
                 incoming_flow = gp.quicksum(
                     self.paths[j, i, s] for j in self.G.predecessors(i) if (j, i, s) in self.paths)
                 outgoing_flow = gp.quicksum(
@@ -236,6 +239,7 @@ class OptimizationProblem:
                 incoming_flow += incoming_station_changes
                 outgoing_flow += outgoing_station_changes
 
+                # 起点和终点的特殊处理
                 if i == start_node and s == start_station:
                     self.model.addConstr(outgoing_flow == 1, name=f"start_outflow_{i}_{s}")
                     self.model.addConstr(incoming_flow == 0, name=f"start_inflow_{i}_{s}")
@@ -245,30 +249,42 @@ class OptimizationProblem:
                 else:
                     self.model.addConstr(incoming_flow == outgoing_flow, name=f"flow_balance_{i}_{s}")
 
+        # 限制最大站点转换次数
         self.model.addConstr(gp.quicksum(self.station_changes.values()) <= max_station_changes,
                              name="max_station_changes")
 
+        # 添加路径和能量消耗的约束
         for i, j in self.G.edges():
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
+                # print(f"Energy consumption for {i} -> {j} using {s}: {self.energy_constraints[i, j, s]}")
                 energy_consumption = self.energy_constraints[i, j, s]
 
-                self.model.addConstr(
-                    self.paths[i, j, s] * energy_consumption <= self.energy_vars[i][s],
-                    name=f"PathEnergyFeasibility_{i}_{j}_{s}"
-                )
-                print(self.energy_vars[i][s])
+                # 创建辅助变量 can_traverse 表示路径是否可行
+                can_traverse = self.model.addVar(vtype=GRB.BINARY, name=f"can_traverse_{i}_{j}_{s}")
 
+                # 约束：如果能量足够，can_traverse == 1，否则 == 0
                 self.model.addConstr(
-                    self.energy_vars[j][s] >= self.energy_vars[i][s] - energy_consumption * self.paths[i, j, s],
+                    self.energy_vars[i][s] - energy_consumption * can_traverse >= 0,
+                    name=f"EnergyFeasibility_{i}_{j}_{s}"
+                )
+
+                # 约束：can_traverse 必须为 1 才能选择该路径
+                self.model.addConstr(
+                    self.paths[i, j, s] <= can_traverse,
+                    name=f"PathFeasibility_{i}_{j}_{s}"
+                )
+
+                # 更新能量：只有当路径可行时，才相减
+                self.model.addConstr(
+                    self.energy_vars[j][s] == self.energy_vars[i][s] - energy_consumption * self.paths[
+                        i, j, s] * can_traverse,
                     name=f"EnergyConsumption_{i}_{j}_{s}"
                 )
-                self.model.update()
-                print(self.energy_vars[i][s])
 
-        # energy reset
+        # 能量重置逻辑
         initial_energy = {  # in wh
-            'eb': 50,
-            'es': 35,
+            'eb': 1000000000,
+            'es': 1000,
             'ec': 3000,
             'walk': 0
         }
@@ -276,8 +292,15 @@ class OptimizationProblem:
             for s1 in self.node_stations[i]:
                 for s2 in self.node_stations[i]:
                     if s1 != s2:
+                        print(s1, s2)
+                        # 如果发生站点转换，重置新的交通工具的能量
                         self.model.addConstr(
                             self.energy_vars[i][s2] >= self.station_changes[i, s1, s2] * initial_energy[s2],
+                            name=f"EnergyReset_{i}_{s1}_{s2}"
+                        )
+                        # 如果发生站点切换，重置新的交通工具的能量
+                        self.model.addConstr(
+                            self.energy_vars[i][s2] == self.station_changes[i, s1, s2] * initial_energy[s2],
                             name=f"EnergyReset_{i}_{s1}_{s2}"
                         )
 
@@ -294,6 +317,10 @@ class OptimizationProblem:
             print("Model is unbounded.")
         else:
             print(f"Optimization ended with status {self.model.status}")
+
+        for (i, j, s), var in self.paths.items():
+            if var.X > 0.5:
+                print(f"Path selected: {i} -> {j} using {s}")
 
         return self.model, end_time - start_time
 
@@ -760,6 +787,7 @@ with open(output_csv_file, 'w', newline='') as csvfile:
             try:
                 # Solve the problem and measure execution time
                 prob, execution_time = optimization_problem.solve()
+
                 optimization_problem.model.write("mymodel.lp")
 
                 #     if optimization_problem.model.status == GRB.INFEASIBLE:
