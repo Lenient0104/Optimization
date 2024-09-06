@@ -141,13 +141,11 @@ class OptimizationProblem:
         if self.model is None:
             raise ValueError("Model is not initialized. Call setup_model() first.")
 
-        # 创建路径决策变量
         for i, j in self.G.edges():
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
                 var_name = f"path_{i}_{j}_{s}"
                 self.paths[i, j, s] = self.model.addVar(vtype=GRB.BINARY, name=var_name)
 
-        # 创建站点转换决策变量
         for i in self.G.nodes:
             for s1 in self.preferred_station[i]:
                 for s2 in self.preferred_station[i]:
@@ -155,18 +153,20 @@ class OptimizationProblem:
                         var_name = f"station_change_{i}_{s1}_{s2}"
                         self.station_changes[i, s1, s2] = self.model.addVar(vtype=GRB.BINARY, name=var_name)
 
-        # 初始化每个节点上每个交通工具的能量变量
-        initial_energy = 50  # 设定初始能量
+        initial_energy = {  # in wh
+            'eb': 50,
+            'es': 35,
+            'ec': 3000,
+            'walk': 100
+        }
         for i in self.G.nodes:
             self.energy_vars[i] = {}
             for s in self.node_stations[i]:
                 var_name = f"energy_{i}_{s}"
                 self.energy_vars[i][s] = self.model.addVar(vtype=GRB.CONTINUOUS, name=var_name)
-                # 赋初值
-                self.model.addConstr(self.energy_vars[i][s] == initial_energy, name=f"InitialEnergy_{i}_{s}")
+                self.model.addConstr(self.energy_vars[i][s] == initial_energy[s], name=f"InitialEnergy_{i}_{s}")
 
     def setup_costs(self):
-        # 设置路径的传输成本
         for i, j in self.G.edges():
             edge_weight = self.G[i][j]['weight']
             edge_id = i
@@ -193,37 +193,20 @@ class OptimizationProblem:
                         else:
                             self.station_change_costs[i, s1, s2] = self.M
 
+    def calculate_energy(self, s, d):
+        ENERGY_CONSUMPTION_RATES = {
+            'eb': 0.016,  # Wh/m
+            'es': 0.025,  # Wh/m
+            'ec': 0.175,  # Wh/m
+            'walk': 0
+        }
+        return ENERGY_CONSUMPTION_RATES[s] * d
+
     def setup_energy_constraints(self, m):
         for i, j in self.G.edges():
-            edge_id = i
-            speeds = self.speed_dict[edge_id]
+            edge_weight = self.G[i][j]['weight']
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
-                if s != 'walk':
-                    if s == 'es':
-                        escooter_calculator = e_scooter.Escooter_PowerConsumptionCalculator()
-                        # 计算能量消耗
-                        self.energy_constraints[i, j, s] = escooter_calculator.calculate(
-                            speeds['bike_speed'], m
-                        )
-                        if speeds['bike_speed'] == 0:
-                            self.energy_constraints[i, j, s] = 1e7
-                    elif s == 'eb':
-                        ebike_calculator = e_bike.Ebike_PowerConsumptionCalculator()
-                        self.energy_constraints[i, j, s] = ebike_calculator.calculate(
-                            speeds['bike_speed'], m, 1)
-                        if speeds['bike_speed'] == 0:
-                            self.energy_constraints[i, j, s] = 1e7
-                    else:
-                        ecar_calculator = e_car.ECar_EnergyConsumptionModel(4)
-                        self.energy_constraints[i, j, s] = ecar_calculator.calculate_energy_loss(
-                            speeds['car_speed'])
-                        if self.energy_constraints[i, j, s] == 0:
-                            self.energy_constraints[i, j, s] = 60
-                else:
-                    self.energy_constraints[i, j, s] = 0
-        test = self.energy_constraints['-13904652', '41502636#0', 'ec']
-        print(test)
-
+                self.energy_constraints[i, j, s] = self.calculate_energy(s, edge_weight)
 
     def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes):
         obj = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
@@ -785,7 +768,8 @@ with open(output_csv_file, 'w', newline='') as csvfile:
 
                     path_finder = PathFinder(optimization_problem.paths, optimization_problem.station_changes,
                                              optimization_problem.costs,
-                                             optimization_problem.station_change_costs, optimization_problem.energy_constraints)
+                                             optimization_problem.station_change_costs,
+                                             optimization_problem.energy_constraints)
                     path_sequence, station_change_count = path_finder.generate_path_sequence(start_node, 'walk',
                                                                                              end_node, 'walk')
 
