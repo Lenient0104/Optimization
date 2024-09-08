@@ -162,7 +162,7 @@ class OptimizationProblem:
             'eb': 50,
             'es': 35,
             'ec': 3000,
-            'walk': 100
+            'walk': 0
         }
         for i in self.G.nodes:
             self.energy_vars[i] = {}
@@ -264,13 +264,18 @@ class OptimizationProblem:
                 print(self.energy_vars[i][s])
 
         # energy reset
-        initial_energy = 50
+        initial_energy = {  # in wh
+            'eb': 50,
+            'es': 35,
+            'ec': 3000,
+            'walk': 0
+        }
         for i in self.G.nodes:
             for s1 in self.preferred_station[i]:
                 for s2 in self.preferred_station[i]:
                     if s1 != s2:
                         self.model.addConstr(
-                            self.energy_vars[i][s2] >= self.station_changes[i, s1, s2] * initial_energy,
+                            self.energy_vars[i][s2] >= self.station_changes[i, s1, s2] * initial_energy[s2],
                             name=f"EnergyReset_{i}_{s1}_{s2}"
                         )
 
