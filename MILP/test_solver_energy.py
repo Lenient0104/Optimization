@@ -254,14 +254,13 @@ class OptimizationProblem:
                     self.paths[i, j, s] * energy_consumption <= self.energy_vars[i][s],
                     name=f"PathEnergyFeasibility_{i}_{j}_{s}"
                 )
-                print(self.energy_vars[i][s])
-
+                # print(self.energy_vars[i][s])
                 self.model.addConstr(
                     self.energy_vars[j][s] >= self.energy_vars[i][s] - energy_consumption * self.paths[i, j, s],
                     name=f"EnergyConsumption_{i}_{j}_{s}"
                 )
                 self.model.update()
-                print(self.energy_vars[i][s])
+                # print(self.energy_vars[i][s])
 
         # energy reset
         initial_energy = {  # in wh
