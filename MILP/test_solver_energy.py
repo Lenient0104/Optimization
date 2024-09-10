@@ -195,6 +195,53 @@ class OptimizationProblem:
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
                 self.energy_constraints[i, j, s] = self.calculate_energy(s, edge_weight)
 
+    def set_up_fees(self):
+        self.fees = {}
+        # 成本系数
+        cost_coefficients = {
+            'ec': 0.05,  # 电动汽车每公里成本
+            'eb': 0.01,  # 电动自行车每公里成本
+            'es': 0.02,  # 电动滑板车每公里成本
+            'walk': 0  # 步行每公里成本
+        }
+
+        # 利润率
+        profit_margins = {
+            'ec': 0.15,
+            'eb': 0.10,
+            'es': 0.12,
+            'walk': 0
+        }
+
+        for i, j in self.G.edges():
+            edge_weight = self.G[i][j]['weight']
+            for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
+                if s not in self.user_preference:
+                    self.fees[i, j, s] = 1e7
+                else:
+                    base_cost = cost_coefficients[s] * edge_weight
+                    self.fees[i, j, s] = base_cost * (1 + profit_margins[s])
+
+    def set_up_walking_distance(self):
+        self.walk_distances = {}
+        for i, j in self.G.edges():
+            edge_weight = self.G[i][j]['weight']
+            for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
+                if s == 'walk':
+                    self.walk_distances[i, j, s] = edge_weight
+
+    def set_up_safety(self):
+        self.safety_scores = {}
+        safety_level = {
+            'es': 1,
+            'eb': 2,
+            'ec': 3,
+            'walk': 4
+        }
+        for i, j in self.G.edges():
+            for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
+                self.safety_scores[i, j, s] = safety_level[s]
+
     def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes):
         obj = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
               gp.quicksum(self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
