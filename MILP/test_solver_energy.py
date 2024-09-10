@@ -164,6 +164,7 @@ class OptimizationProblem:
             'ec': 3000,
             'walk': 0
         }
+
         for i in self.G.nodes:
             self.energy_vars[i] = {}
             for s in self.node_stations[i]:
@@ -246,6 +247,22 @@ class OptimizationProblem:
         self.model.addConstr(gp.quicksum(self.station_changes.values()) <= max_station_changes,
                              name="max_station_changes")
 
+        # energy reset
+        initial_energy = {  # in wh
+            'eb': 50,
+            'es': 35,
+            'ec': 3000,
+            'walk': 0
+        }
+        for i in self.G.nodes:
+            for s1 in self.preferred_station[i]:
+                for s2 in self.preferred_station[i]:
+                    if s1 != s2:
+                        self.model.addConstr(
+                            self.energy_vars[i][s2] >= self.station_changes[i, s1, s2] * initial_energy[s2],
+                            name=f"EnergyReset_{i}_{s1}_{s2}"
+                        )
+
         for i, j in self.G.edges():
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
                 energy_consumption = self.energy_constraints[i, j, s]
@@ -262,21 +279,7 @@ class OptimizationProblem:
                 self.model.update()
                 # print(self.energy_vars[i][s])
 
-        # energy reset
-        initial_energy = {  # in wh
-            'eb': 50,
-            'es': 35,
-            'ec': 3000,
-            'walk': 0
-        }
-        for i in self.G.nodes:
-            for s1 in self.preferred_station[i]:
-                for s2 in self.preferred_station[i]:
-                    if s1 != s2:
-                        self.model.addConstr(
-                            self.energy_vars[i][s2] >= self.station_changes[i, s1, s2] * initial_energy[s2],
-                            name=f"EnergyReset_{i}_{s1}_{s2}"
-                        )
+
 
     def solve(self):
         start_time = time.time()
