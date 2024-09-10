@@ -5,8 +5,6 @@
 
 
 
-
-
 from google.cloud import bigtable
 from google.cloud.bigtable import row_filters
 import json
