@@ -180,6 +180,33 @@ class OptimizationProblem:
                         else:
                             self.station_change_costs[i, s1, s2] = self.M
 
+    def set_up_fees(self):
+        self.fees = {}
+        # 成本系数
+        cost_coefficients = {
+            'ec': 0.05,  # 电动汽车每公里成本
+            'eb': 0.01,  # 电动自行车每公里成本
+            'es': 0.02,  # 电动滑板车每公里成本
+            'walk': 0  # 步行每公里成本
+        }
+
+        # 利润率
+        profit_margins = {
+            'ec': 0.15,
+            'eb': 0.10,
+            'es': 0.12,
+            'walk': 0
+        }
+
+        for i, j in self.G.edges():
+            edge_weight = self.G[i][j]['weight']
+            for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
+                if s not in self.user_preference:
+                    self.fees[i, j, s] = 1e7
+                else:
+                    base_cost = cost_coefficients[s] * edge_weight
+                    self.fees[i, j, s] = base_cost * (1 + profit_margins[s])
+
     def calculate_energy(self, s, d):
         ENERGY_CONSUMPTION_RATES = {
             'eb': 0.016,  # Wh/m
@@ -196,10 +223,13 @@ class OptimizationProblem:
                 self.energy_constraints[i, j, s] = self.calculate_energy(s, edge_weight)
 
     def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes):
-        obj = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
+        obj_time_min = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
               gp.quicksum(self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
                           self.station_changes)
-        objs_dict = {1: {'objective': obj, 'priority': 1, 'relative tolerance': 0.01, 'weight': 1}}
+        obj_fees_min = gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths)
+        objs_dict = {1: {'objective': obj_time_min, 'priority': 1, 'relative tolerance': 0.01, 'weight': 1},
+                     2: {'objective': obj_fees_min, 'priority': 2, 'relative tolerance': 0.01, 'weight': 1}
+                     }
 
         self.model.ModelSense = gp.GRB.MINIMIZE
         for i in objs_dict:
@@ -523,6 +553,7 @@ with open(output_csv_file, 'w', newline='') as csvfile:
             optimization_problem.setup_model()
             optimization_problem.setup_decision_variables()
             optimization_problem.setup_costs()
+            optimization_problem.set_up_fees()
             optimization_problem.setup_energy_constraints(50)
             optimization_problem.setup_problem(start_node, 'walk', end_node, 'walk', max_station_changes)
 
@@ -540,7 +571,15 @@ with open(output_csv_file, 'w', newline='') as csvfile:
                 #     print(f"Gurobi Error: {e}")
 
                 if optimization_problem.model.status == GRB.OPTIMAL:
-                    total_cost = optimization_problem.model.ObjVal
+                    # 假设你已经设置了多个目标，下面是打印所有目标的值的代码
+                    num_of_objectives = optimization_problem.model.NumObj  # 获取目标函数的数量
+
+                    # 遍历所有目标并打印其值
+                    for i in range(num_of_objectives):
+                        obj_value = optimization_problem.model.getObjective(i).getValue()
+                        print(f"Objective {i} value: {obj_value}")
+                    total_cost = optimization_problem.model.getObjective(1).getValue()
+
                     # total_cost = pulp.value(prob.objective)
 
                     path_finder = PathFinder(optimization_problem.paths, optimization_problem.station_changes,
