@@ -201,7 +201,7 @@ class OptimizationProblem:
         for i, j in self.G.edges():
             edge_weight = self.G[i][j]['weight']
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
-                if s not in self.user_preference:
+                if s not in self.user_preference and s != 'walk':
                     self.fees[i, j, s] = 1e7
                 else:
                     base_cost = cost_coefficients[s] * edge_weight
