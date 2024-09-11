@@ -180,6 +180,16 @@ class OptimizationProblem:
                         else:
                             self.station_change_costs[i, s1, s2] = self.M
 
+    def set_up_walking_distance(self):
+        self.walk_distances = {}
+        for i, j in self.G.edges():
+            edge_weight = self.G[i][j]['weight']
+            for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
+                if s == 'walk':
+                    self.walk_distances[i, j, s] = edge_weight
+                else:
+                    self.walk_distances[i, j, s] = 0
+
     def set_up_fees(self):
         self.fees = {}
         # 成本系数
@@ -207,6 +217,18 @@ class OptimizationProblem:
                     base_cost = cost_coefficients[s] * edge_weight
                     self.fees[i, j, s] = base_cost * (1 + profit_margins[s])
 
+    def set_up_safety(self):
+        self.safety_scores = {}
+        safety_level = {
+            'es': 1,
+            'eb': 2,
+            'ec': 3,
+            'walk': 4
+        }
+        for i, j in self.G.edges():
+            for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
+                self.safety_scores[i, j, s] = safety_level[s]
+
     def calculate_energy(self, s, d):
         ENERGY_CONSUMPTION_RATES = {
             'eb': 0.016,  # Wh/m
@@ -227,8 +249,12 @@ class OptimizationProblem:
               gp.quicksum(self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
                           self.station_changes)
         obj_fees_min = gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths)
+        obj_walking_distance_min = gp.quicksum(self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
+        # obj_safety_scores_min = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
         objs_dict = {1: {'objective': obj_time_min, 'priority': 1, 'relative tolerance': 0.01, 'weight': 1},
-                     2: {'objective': obj_fees_min, 'priority': 2, 'relative tolerance': 0.01, 'weight': 1}
+                     2: {'objective': obj_fees_min, 'priority': 2, 'relative tolerance': 0.01, 'weight': 1},
+                     3: {'objective': obj_walking_distance_min, 'priority': 3, 'relative tolerance': 0.01, 'weight': 1},
+                     # 4: {'objective': obj_safety_scores_min, 'priority': 4, 'relative tolerance': 0.01, 'weight': -1}
                      }
 
         self.model.ModelSense = gp.GRB.MINIMIZE
@@ -554,6 +580,8 @@ with open(output_csv_file, 'w', newline='') as csvfile:
             optimization_problem.setup_decision_variables()
             optimization_problem.setup_costs()
             optimization_problem.set_up_fees()
+            optimization_problem.set_up_walking_distance()
+            # optimization_problem.set_up_safety()
             optimization_problem.setup_energy_constraints(50)
             optimization_problem.setup_problem(start_node, 'walk', end_node, 'walk', max_station_changes)
 
