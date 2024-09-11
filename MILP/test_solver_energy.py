@@ -195,82 +195,18 @@ class OptimizationProblem:
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
                 self.energy_constraints[i, j, s] = self.calculate_energy(s, edge_weight)
 
-    def set_up_fees(self):
-        self.fees = {}
-        # 成本系数
-        cost_coefficients = {
-            'ec': 0.05,  # 电动汽车每公里成本
-            'eb': 0.01,  # 电动自行车每公里成本
-            'es': 0.02,  # 电动滑板车每公里成本
-            'walk': 0  # 步行每公里成本
-        }
-
-        # 利润率
-        profit_margins = {
-            'ec': 0.15,
-            'eb': 0.10,
-            'es': 0.12,
-            'walk': 0
-        }
-
-        for i, j in self.G.edges():
-            edge_weight = self.G[i][j]['weight']
-            for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
-                if s not in self.user_preference:
-                    self.fees[i, j, s] = 1e7
-                else:
-                    base_cost = cost_coefficients[s] * edge_weight
-                    self.fees[i, j, s] = base_cost * (1 + profit_margins[s])
-
-    def set_up_walking_distance(self):
-        self.walk_distances = {}
-        for i, j in self.G.edges():
-            edge_weight = self.G[i][j]['weight']
-            for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
-                if s == 'walk':
-                    self.walk_distances[i, j, s] = edge_weight
-                else:
-                    self.walk_distances[i, j, s] = 0
-
-    def set_up_safety(self):
-        self.safety_scores = {}
-        safety_level = {
-            'es': 1,
-            'eb': 2,
-            'ec': 3,
-            'walk': 4
-        }
-        for i, j in self.G.edges():
-            for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
-                self.safety_scores[i, j, s] = safety_level[s]
-
     def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes):
-        """ Objective function 1 - minimize the time cost """
-        obj_time = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
+        obj = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
               gp.quicksum(self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
                           self.station_changes)
-        """ Objective function 2 - minimize the fees """
-        obj_fees = gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths)
-        """ Objective function 3 - minimize the walking distance """
-        obj_walking_distance = gp.quicksum(self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
-        """ Objective function 4 - maximize the safety scores """
-        obj_safety_scores = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
-
-        objs_dict = {1: {'objective': obj_time, 'priority': 1, 'relative tolerance': 0.01, 'weight': 1},
-                     2: {'objective': obj_fees, 'priority': 2, 'relative tolerance': 0.01, 'weight': 1},
-                     3: {'objective': obj_walking_distance, 'priority': 3, 'relative tolerance': 0.01, 'weight': 1},
-                     4: {'objective': obj_safety_scores, 'priority': 4, 'relative tolerance': 0.01, 'weight': -1}
-        }
+        objs_dict = {1: {'objective': obj, 'priority': 1, 'relative tolerance': 0.01, 'weight': 1}}
 
         self.model.ModelSense = gp.GRB.MINIMIZE
         for i in objs_dict:
             self.model.setObjectiveN(objs_dict[i]['objective'], index=i,
-                                         priority=objs_dict[i]['priority'],
-                                         reltol=objs_dict[i]['relative tolerance'],
-                                         weight=objs_dict[i]['weight'])
-
-
-        # self.model.setObjective(obj_time, GRB.MINIMIZE)
+                                     priority=objs_dict[i]['priority'],
+                                     reltol=objs_dict[i]['relative tolerance'],
+                                     weight=objs_dict[i]['weight'])
 
         for i in self.G.nodes:
             for s in self.node_stations[i]:
@@ -370,7 +306,6 @@ class PathFinder:
 
             # Look for the next path step
             for (i, j, s) in self.paths:
-                print("working")
                 if i == current_node and s == current_mode and self.paths[i, j, s].X == 1:
                     path_cost = self.costs[i, j, s]
                     energy_consumption = self.energy_constraints[i, j, s]
@@ -382,7 +317,6 @@ class PathFinder:
 
             # Look for the next station change
             for (i, s1, s2) in self.station_changes:
-                print("also working")
                 if i == current_node and s1 == current_mode and self.station_changes[i, s1, s2].X == 1:
                     mode_change_cost = self.station_change_costs[i, s1, s2]
                     path_sequence.append((i, s1, s2, mode_change_cost))
@@ -393,7 +327,7 @@ class PathFinder:
             # Check if destination is reached
             if current_node == end_node and current_mode == end_station:
                 destination_reached = True
-            else:
+            elif not next_step_found:
                 print("Destination not reached. Path may be incomplete.")
                 break
 
@@ -590,9 +524,6 @@ with open(output_csv_file, 'w', newline='') as csvfile:
             optimization_problem.setup_decision_variables()
             optimization_problem.setup_costs()
             optimization_problem.setup_energy_constraints(50)
-            optimization_problem.set_up_fees()
-            optimization_problem.set_up_walking_distance()
-            optimization_problem.set_up_safety()
             optimization_problem.setup_problem(start_node, 'walk', end_node, 'walk', max_station_changes)
 
             try:
