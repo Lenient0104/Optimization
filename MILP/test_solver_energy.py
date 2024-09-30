@@ -246,15 +246,17 @@ class OptimizationProblem:
 
     def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes):
         obj_time_min = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
-              gp.quicksum(self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
-                          self.station_changes)
+                       gp.quicksum(
+                           self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
+                           self.station_changes)
         obj_fees_min = gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths)
-        obj_walking_distance_min = gp.quicksum(self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
-        # obj_safety_scores_min = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
+        obj_walking_distance_min = gp.quicksum(
+            self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
+        obj_safety_scores_min = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
         objs_dict = {1: {'objective': obj_time_min, 'priority': 1, 'relative tolerance': 0.01, 'weight': 1},
                      2: {'objective': obj_fees_min, 'priority': 2, 'relative tolerance': 0.01, 'weight': 1},
                      3: {'objective': obj_walking_distance_min, 'priority': 3, 'relative tolerance': 0.01, 'weight': 1},
-                     # 4: {'objective': obj_safety_scores_min, 'priority': 4, 'relative tolerance': 0.01, 'weight': -1}
+                     4: {'objective': obj_safety_scores_min, 'priority': 4, 'relative tolerance': 0.01, 'weight': -0.00000000001}
                      }
 
         self.model.ModelSense = gp.GRB.MINIMIZE
@@ -322,8 +324,6 @@ class OptimizationProblem:
                 )
                 self.model.update()
                 # print(self.energy_vars[i][s])
-
-
 
     def solve(self):
         start_time = time.time()
@@ -486,7 +486,6 @@ class ReducedGraphCreator:
         return new_graph
 
 
-
 ######################O*****************Original END *********************
 ##########################################################################
 
@@ -494,9 +493,9 @@ class ReducedGraphCreator:
 #################PipeLine to Execute the OD pairs from CSV ###################
 
 # Main code
-file_path = "/Users/dingyue/Documents/Optimization_new/MILP/DCC.net.xml"
-speed_file_path = '/Users/dingyue/Documents/Optimization_new/MILP/query_results-0.json'
-od_pairs_file = '/Users/dingyue/Documents/Optimization_new/MILP/od_pairs.csv'  # Path to the CSV file containing OD pairs
+file_path = "DCC.net.xml"
+speed_file_path = 'query_results-0.json'
+od_pairs_file = 'od_pairs.csv'  # Path to the CSV file containing OD pairs
 output_csv_file = 'RG_TimeTest_50_Nodes.csv'  # Output CSV file to store the results
 
 # Create graph from XML file
@@ -537,8 +536,6 @@ speed_dict = {entry['edge_id']: {'pedestrian_speed': float(entry['pedestrian_spe
                                  'bike_speed': float(entry['bike_speed']),
                                  'car_speed': float(entry['car_speed'])}
               for entry in speed_data}
-
-
 
 # Prepare the output CSV file
 with open(output_csv_file, 'w', newline='') as csvfile:
@@ -581,7 +578,7 @@ with open(output_csv_file, 'w', newline='') as csvfile:
             optimization_problem.setup_costs()
             optimization_problem.set_up_fees()
             optimization_problem.set_up_walking_distance()
-            # optimization_problem.set_up_safety()
+            optimization_problem.set_up_safety()
             optimization_problem.setup_energy_constraints(50)
             optimization_problem.setup_problem(start_node, 'walk', end_node, 'walk', max_station_changes)
 
@@ -589,14 +586,6 @@ with open(output_csv_file, 'w', newline='') as csvfile:
                 # Solve the problem and measure execution time
                 prob, execution_time = optimization_problem.solve()
                 optimization_problem.model.write("mymodel.lp")
-
-                #     if optimization_problem.model.status == GRB.INFEASIBLE:
-                #         print("Model is infeasible. Computing IIS...")
-                #         optimization_problem.model.computeIIS()
-                #         optimization_problem.model.write("model.ilp")
-                #         print("IIS written to file 'model.ilp'")
-                # except gp.GurobiError as e:
-                #     print(f"Gurobi Error: {e}")
 
                 if optimization_problem.model.status == GRB.OPTIMAL:
                     # 假设你已经设置了多个目标，下面是打印所有目标的值的代码
@@ -620,7 +609,6 @@ with open(output_csv_file, 'w', newline='') as csvfile:
                     end_time = time.time()
                     Total_time = end_time - initial_time
 
-                    # route_with_weights = route_finder.get_complete_route_with_weights(path_sequence, shortest_routes_start, shortest_routes_dest, all_shortest_routes_pairs, shortest_route_start_end)
                     # Write results to CSV
                     writer.writerow([start_node, end_node, total_cost, Total_time, path_sequence])
                 else:
