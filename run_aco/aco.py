@@ -93,6 +93,9 @@ class Ant:
         possible_next_moves = []
         graph = self.graph
         for next_edge in graph.neighbors(current_edge):
+            if current_edge == '4395595#0':
+                if next_edge == '361450282':
+                    print("hehe")
             edge_data = graph.get_edge_data(current_edge, next_edge)
             for key, edge_data in edge_data.items():
                 mode = key
@@ -560,6 +563,8 @@ def run_aco_algorithm(optimizer, start_edge, destination_edge, number_of_ants, e
     edge_path = []
     for i in range(0, len(best_path) - 1):
         current_edge = best_path[i][0]
+        if current_edge == '361450282':
+            print('hehe')
         next_edge = best_path[i+1][0]
         mode = best_path[i][1]
         vehicle_id = best_path[i][2]
