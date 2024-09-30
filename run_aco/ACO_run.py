@@ -32,10 +32,11 @@ class ACO_RUN:
         if graph is None:
             print("The graph can not be constructed")
         else:
-            path, time_cost, exe_time = aco.run_aco_algorithm(optimizer_interface, self.start_edge, self.destination_edge,
+            path, edges, time_cost, exe_time = aco.run_aco_algorithm(optimizer_interface, self.start_edge, self.destination_edge,
                                                               self.ant_num, self.energy_rate)
             print("The total time cost is:", time_cost, "seconds")
             print("The optimal path is:", path)
+            print("edges are:", edges)
 
 
 if __name__ == "__main__":

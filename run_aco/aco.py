@@ -557,6 +557,7 @@ def run_aco_algorithm(optimizer, start_edge, destination_edge, number_of_ants, e
         exe_time = end_time - start_time
     # self.visualization(time_costs, number_of_ants)
     expanded_path = []
+    edge_path = []
     for i in range(0, len(best_path) - 1):
         current_edge = best_path[i][0]
         next_edge = best_path[i+1][0]
@@ -582,5 +583,18 @@ def run_aco_algorithm(optimizer, start_edge, destination_edge, number_of_ants, e
                 unit_remaining_energy = begin_energy - unit_energy_consumption
                 begin_energy = unit_remaining_energy
                 expanded_path.append((edge, mode, vehicle_id, unit_remaining_energy, edge_speed, unit_time))
+                edge_path.append(edge)
 
-    return expanded_path, best_time_cost, exe_time
+        # Join array elements with a space
+        formatted_edges = " ".join(edge_path)
+
+        # Define the output file name
+        output_file = "formatted_edges.txt"
+
+        # Write the formatted edges to the output file
+        with open(output_file, "w") as file:
+            file.write(formatted_edges)
+
+        print(f"Formatted edges have been written to '{output_file}'")
+
+    return expanded_path, edge_path, best_time_cost, exe_time
