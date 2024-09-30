@@ -245,7 +245,7 @@ class MultiModalQLearningAgent:
             initial_energy = initial_energy - energy_consumed
             total_time += time
             mode_key = None
-            for edge in path:
+            for edge in path[:-1]:
                 unit_energy_consumption = self.calculate_energy_comsumption(mode, optimizer.edge_map[edge]['length'])
                 if mode == 'walking':
                     mode_key = "pedestrian_speed"
