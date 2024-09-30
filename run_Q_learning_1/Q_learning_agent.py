@@ -208,6 +208,7 @@ class MultiModalQLearningAgent:
 
         current_state = start
         optimal_path = []
+        edges = []
         route = [current_state]
         modes = []
         last_mode = None

@@ -208,6 +208,7 @@ class MultiModalQLearningAgent:
 
         current_state = start
         optimal_path = []
+        edges = []
         route = [current_state]
         modes = []
         last_mode = None
@@ -260,10 +261,24 @@ class MultiModalQLearningAgent:
                 unit_remaining_energy = begin_energy-unit_energy_consumption
                 begin_energy = unit_remaining_energy
                 optimal_path.append((edge, mode, vehicle_id, unit_remaining_energy, edge_speed, unit_time))
+                edges.append(edge)
             current_state = next_state
             route.append(current_state)
             last_mode = mode
         print('optimal path is:', optimal_path)
+        print('edges:', edges)
+
+        # Join array elements with a space
+        formatted_edges = " ".join(edges)
+
+        # Define the output file name
+        output_file = "formatted_edges.txt"
+
+        # Write the formatted edges to the output file
+        with open(output_file, "w") as file:
+            file.write(formatted_edges)
+
+        print(f"Formatted edges have been written to '{output_file}'")
 
         if current_state == destination:
             # print("Best route:")

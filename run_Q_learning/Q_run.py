@@ -35,6 +35,8 @@ class Q_RUN:
         print("The total time cost is:", total_time_cost, 'seconds')
         if not find:
             print("Failed to find a valid path")
+        # print(best_route)
+
         # else:
         #     print(best_route)
         #     print(best_modes)
