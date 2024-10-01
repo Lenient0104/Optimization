@@ -93,9 +93,6 @@ class Ant:
         possible_next_moves = []
         graph = self.graph
         for next_edge in graph.neighbors(current_edge):
-            if current_edge == '4395595#0':
-                if next_edge == '361450282':
-                    print("hehe")
             edge_data = graph.get_edge_data(current_edge, next_edge)
             for key, edge_data in edge_data.items():
                 mode = key
@@ -549,57 +546,50 @@ def run_aco_algorithm(optimizer, start_edge, destination_edge, number_of_ants, e
     if current_best_ant is not None:
         best_path = current_best_ant.path
         best_time_cost = current_best_ant.total_time_cost + optimizer.edge_map[destination_edge]['length'] / 1.5
-    # best_distance_cost = current_best_ant.path_length
-
-    # if (iteration + 1) % log_interval == 0 or iteration == number_of_iterations - 1: print( f"Iteration {
-    # iteration + 1}/{number_of_iterations}: Best Path = {best_path}, Time Cost = {best_time_cost},
-    # Total Distance = {best_distance_cost}")
 
     if not flag:
         end_time = time.time()
         exe_time = end_time - start_time
-    # self.visualization(time_costs, number_of_ants)
+
+    # Prepare for the output
     expanded_path = []
     edge_path = []
     for i in range(0, len(best_path) - 1):
         current_edge = best_path[i][0]
-        if current_edge == '361450282':
-            print('hehe')
         next_edge = best_path[i+1][0]
         mode = best_path[i][1]
         vehicle_id = best_path[i][2]
         begin_energy = best_path[i][3]
         path = optimizer.new_graph[current_edge][next_edge][mode]['path']
-        for edge in path:
+        for edge in path[:-1]:
             mode_key = None
-            for edge in path:
-                unit_energy_consumption = ant.calculate_energy_comsumption(mode, optimizer.edge_map[edge]['length'])
-                if mode == 'walking':
-                    mode_key = "pedestrian_speed"
-                elif mode == 'e_bike_1' or mode == 'e_scooter_1':
-                    mode_key = "bike_speed"
-                elif mode == 'e_car':
-                    mode_key = "car_speed"
-                edge_speed = float(optimizer.simulation_data[edge][mode_key])
-                if edge_speed == 0:
-                    unit_time = 50
-                else:
-                    unit_time = optimizer.edge_map[edge]['length'] / edge_speed
-                unit_remaining_energy = begin_energy - unit_energy_consumption
-                begin_energy = unit_remaining_energy
-                expanded_path.append((edge, mode, vehicle_id, unit_remaining_energy, edge_speed, unit_time))
-                edge_path.append(edge)
+            unit_energy_consumption = ant.calculate_energy_comsumption(mode, optimizer.edge_map[edge]['length'])
+            if mode == 'walking':
+                mode_key = "pedestrian_speed"
+            elif mode == 'e_bike_1' or mode == 'e_scooter_1':
+                mode_key = "bike_speed"
+            elif mode == 'e_car':
+                mode_key = "car_speed"
+            edge_speed = float(optimizer.simulation_data[edge][mode_key])
+            if edge_speed == 0:
+                unit_time = 50
+            else:
+                unit_time = optimizer.edge_map[edge]['length'] / edge_speed
+            unit_remaining_energy = begin_energy - unit_energy_consumption
+            begin_energy = unit_remaining_energy
+            expanded_path.append((edge, mode, vehicle_id, unit_remaining_energy, edge_speed, unit_time))
+            edge_path.append(edge)
 
-        # Join array elements with a space
-        formatted_edges = " ".join(edge_path)
+    # Join array elements with a space
+    formatted_edges = " ".join(edge_path)
 
-        # Define the output file name
-        output_file = "formatted_edges.txt"
+    # Define the output file name
+    output_file = "formatted_edges.txt"
 
-        # Write the formatted edges to the output file
-        with open(output_file, "w") as file:
-            file.write(formatted_edges)
+    # Write the formatted edges to the output file
+    with open(output_file, "w") as file:
+        file.write(formatted_edges)
 
-        print(f"Formatted edges have been written to '{output_file}'")
+    print(f"Formatted edges have been written to '{output_file}'")
 
     return expanded_path, edge_path, best_time_cost, exe_time

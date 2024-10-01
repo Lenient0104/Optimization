@@ -2,6 +2,7 @@ from run_aco import aco
 from user_info import User
 from optimization import Optimization
 
+
 # Download the Bigtable library: pip install google-cloud-bigtable
 # Download the service account, JSON file from the simulation github (AdminBT.json)
 # Set environment variable, GOOGLE_APPLICATION_CREDENTIALS:
@@ -27,13 +28,15 @@ class ACO_RUN:
         self.user = User(60, True, 0, 20)
 
     def run_aco(self):
-        optimizer_interface = Optimization(self.net_xml_path, self.user, self.db_path, self.simulation_time, self.station_num, self.start_edge, self.destination_edge)
+        optimizer_interface = Optimization(self.net_xml_path, self.user, self.db_path, self.simulation_time,
+                                           self.station_num, self.start_edge, self.destination_edge)
         graph = optimizer_interface.new_graph
         if graph is None:
             print("The graph can not be constructed")
         else:
-            path, edges, time_cost, exe_time = aco.run_aco_algorithm(optimizer_interface, self.start_edge, self.destination_edge,
-                                                              self.ant_num, self.energy_rate)
+            path, edges, time_cost, exe_time = aco.run_aco_algorithm(optimizer_interface, self.start_edge,
+                                                                     self.destination_edge,
+                                                                     self.ant_num, self.energy_rate)
             print("The total time cost is:", time_cost, "seconds")
             print("The optimal path is:", path)
             print("edges are:", edges)
