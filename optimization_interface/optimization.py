@@ -202,7 +202,7 @@ class Optimization:
     def get_simulation_data(self):
         # queryTest.query_speed_at_time(self.simulation)
         filename = "query_results-" + str(self.simulation) + ".json"
-        file_path = "/Users/yue/PycharmProjects/Optimization_new/query_results/" + filename
+        file_path = "../../query_results/" + filename
         with open(file_path) as f:
             data = json.load(f)
         data_dict = {entry['edge_id']: entry for entry in data}

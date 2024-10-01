@@ -425,7 +425,4 @@ def run_dqn(optimizer, source_edge, target_edge, episode_number, energy_rate):
     all_DQN_exe_times.append(episode_exe_times)
     all_DQN_times.append(episode_times)
 
-    plt.plot(results)
-    plt.show()
-
     return best_route, best_modes, total_time_cost, execution_time, find
