@@ -129,7 +129,7 @@ class Optimization:
         e_mobility_tools = ['e_car', 'e_scooter_1', 'e_bike_1']
         # if not self.user.driving_license and 'e_car' in user.preference:
         #         e_mobility_stations.remove('e_car')
-        for edge_id in preferred_nodes:
+        for edge_id in edge_to_assign_test:
             edge_stations[edge_id] = ['walking'] + self.user.preference
         return edge_stations
 
@@ -202,7 +202,7 @@ class Optimization:
     def get_simulation_data(self):
         # queryTest.query_speed_at_time(self.simulation)
         filename = "query_results-" + str(self.simulation) + ".json"
-        file_path = "../../../query_results/" + filename
+        file_path = "/Users/yue/PycharmProjects/Optimization_new/query_results/" + filename
         with open(file_path) as f:
             data = json.load(f)
         data_dict = {entry['edge_id']: entry for entry in data}

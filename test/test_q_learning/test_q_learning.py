@@ -40,17 +40,17 @@ class TestDQN(unittest.TestCase):
                 episode_times = []
                 successful_tests = 0
                 print("Simulation: ", simulation)
-                for test_index in range(test_size): # 500 od pairs
+                for test_index in range(test_size):
                     print("test_index", test_index)
                     source_edge, target_edge = od_pairs[test_index]
-                    optimizer = Optimization(self.net_xml_path, self.user, self.db_path, simulation, source_edge,
+                    optimizer = Optimization(self.net_xml_path, self.user, self.db_path, simulation, 0, source_edge,
                                              target_edge)
                     graph = optimizer.new_graph
                     if graph is None:
                         writer.writerow([test_size + 1, self.episodes[0], simulation, 0, 0, False])
                         continue
                     best_route, best_modes, total_time_cost, execution_time, find = Q_learning_agent.run_q_learning(
-                        optimizer, source_edge, target_edge, self.episodes[0])
+                        optimizer, source_edge, target_edge, self.episodes[0], 1)
 
                     print(best_route)
                     print(best_modes)
