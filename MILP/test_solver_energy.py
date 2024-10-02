@@ -252,11 +252,11 @@ class OptimizationProblem:
         obj_fees_min = gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths)
         obj_walking_distance_min = gp.quicksum(
             self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
-        obj_safety_scores_min = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
-        objs_dict = {1: {'objective': obj_time_min, 'priority': 1, 'relative tolerance': 0.01, 'weight': 1},
-                     2: {'objective': obj_fees_min, 'priority': 2, 'relative tolerance': 0.01, 'weight': 1},
-                     3: {'objective': obj_walking_distance_min, 'priority': 3, 'relative tolerance': 0.01, 'weight': 1},
-                     4: {'objective': obj_safety_scores_min, 'priority': 4, 'relative tolerance': 0.01, 'weight': -0.00000000001}
+        obj_safety_scores_max = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
+        objs_dict = {1: {'objective': obj_time_min, 'priority': 2, 'relative tolerance': 0.01, 'weight': 0.00000001},
+                     # 2: {'objective': obj_fees_min, 'priority': 2, 'relative tolerance': 0.01, 'weight': 1},
+                     # 3: {'objective': obj_walking_distance_min, 'priority': 3, 'relative tolerance': 0.01, 'weight': 1},
+                     2: {'objective': obj_safety_scores_max, 'priority': 1, 'relative tolerance': 0.01, 'weight': -1}
                      }
 
         self.model.ModelSense = gp.GRB.MINIMIZE
