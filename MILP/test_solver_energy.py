@@ -197,7 +197,7 @@ class OptimizationProblem:
             'ec': 0.05,  # 电动汽车每公里成本
             'eb': 0.01,  # 电动自行车每公里成本
             'es': 0.02,  # 电动滑板车每公里成本
-            'walk': 0  # 步行每公里成本
+            'walk': 0.001  # 步行每公里成本
         }
 
         # 利润率
@@ -208,11 +208,24 @@ class OptimizationProblem:
             'walk': 0
         }
 
+        # for i, j in self.G.edges():
+        #     edge_weight = self.G[i][j]['weight']
+        #     for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
+        #         if s not in self.user_preference and s != 'walk':
+        #             self.fees[i, j, s] = 1e7
+        #         else:
+        #             base_cost = cost_coefficients[s] * edge_weight
+        #             self.fees[i, j, s] = base_cost * (1 + profit_margins[s])
+
         for i, j in self.G.edges():
             edge_weight = self.G[i][j]['weight']
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
-                if s not in self.user_preference and s != 'walk':
-                    self.fees[i, j, s] = 1e7
+                if s != 'walk':
+                    if s not in self.user_preference:
+                        self.fees[i, j, s] = edge_weight * 1e7
+                    else:
+                        base_cost = cost_coefficients[s] * edge_weight
+                        self.fees[i, j, s] = base_cost * (1 + profit_margins[s])
                 else:
                     base_cost = cost_coefficients[s] * edge_weight
                     self.fees[i, j, s] = base_cost * (1 + profit_margins[s])
@@ -245,26 +258,28 @@ class OptimizationProblem:
                 self.energy_constraints[i, j, s] = self.calculate_energy(s, edge_weight)
 
     def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes):
-        obj_time_min = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
-                       gp.quicksum(
-                           self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
-                           self.station_changes)
+        # obj_time_min = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
+        #                gp.quicksum(
+        #                    self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
+        #                    self.station_changes)
         obj_fees_min = gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths)
-        obj_walking_distance_min = gp.quicksum(
-            self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
-        obj_safety_scores_max = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
-        objs_dict = {1: {'objective': obj_time_min, 'priority': 2, 'relative tolerance': 0.01, 'weight': 0.00000001},
-                     # 2: {'objective': obj_fees_min, 'priority': 2, 'relative tolerance': 0.01, 'weight': 1},
-                     # 3: {'objective': obj_walking_distance_min, 'priority': 3, 'relative tolerance': 0.01, 'weight': 1},
-                     2: {'objective': obj_safety_scores_max, 'priority': 1, 'relative tolerance': 0.01, 'weight': -1}
-                     }
+        # obj_walking_distance_min = gp.quicksum(self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
+        # obj_safety_scores_max = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
+        # objs_dict = {1: {'objective': obj_time_min, 'priority': 2, 'relative tolerance': 0.01, 'weight': 0.00000001},
+        #              # 2: {'objective': obj_fees_min, 'priority': 2, 'relative tolerance': 0.01, 'weight': 1},
+        #              # 3: {'objective': obj_walking_distance_min, 'priority': 3, 'relative tolerance': 0.01, 'weight': 1},
+        #              2: {'objective': obj_safety_scores_max, 'priority': 1, 'relative tolerance': 0.01, 'weight': -1}
+        #              }
 
-        self.model.ModelSense = gp.GRB.MINIMIZE
-        for i in objs_dict:
-            self.model.setObjectiveN(objs_dict[i]['objective'], index=i,
-                                     priority=objs_dict[i]['priority'],
-                                     reltol=objs_dict[i]['relative tolerance'],
-                                     weight=objs_dict[i]['weight'])
+        # self.model.ModelSense = gp.GRB.MINIMIZE
+        # for i in objs_dict:
+        #     self.model.setObjectiveN(objs_dict[i]['objective'], index=i,
+        #                              priority=objs_dict[i]['priority'],
+        #                              reltol=objs_dict[i]['relative tolerance'],
+        #                              weight=objs_dict[i]['weight'])
+        # self.model.setObjective(obj_safety_scores_max, gp.GRB.MAXIMIZE)
+        # self.model.setObjective(obj_time_min, gp.GRB.MINIMIZE)
+        self.model.setObjective(obj_fees_min, gp.GRB.MINIMIZE)
 
         for i in self.G.nodes:
             for s in self.node_stations[i]:
@@ -363,13 +378,14 @@ class PathFinder:
             # Look for the next path step
             for (i, j, s) in self.paths:
                 if i == current_node and s == current_mode and self.paths[i, j, s].X == 1:
+                    # print("yes================")
                     path_cost = self.costs[i, j, s]
                     energy_consumption = self.energy_constraints[i, j, s]
                     path_sequence.append((i, j, s, path_cost, energy_consumption))
                     energy_consumption_sequence.append((i, j, s, energy_consumption))
                     current_node = j
                     next_step_found = True
-                    break
+
 
             # Look for the next station change
             for (i, s1, s2) in self.station_changes:
@@ -383,7 +399,7 @@ class PathFinder:
             # Check if destination is reached
             if current_node == end_node and current_mode == end_station:
                 destination_reached = True
-            elif not next_step_found:
+            else:
                 print("Destination not reached. Path may be incomplete.")
                 break
 
@@ -508,8 +524,8 @@ num_nodes = len(original_G.nodes)
 user_preference = ['eb', 'ec', 'es']
 station_types = ['eb', 'es', 'ec', 'walk']
 node_stations = {i: station_types for i in original_G.nodes}
-start_node = '-375581293#1'
-end_node = '369977729#1'
+start_node = '361450282'
+end_node = '-110407380#1'
 node_stations[start_node] = ['walk']
 node_stations[end_node] = ['walk']
 no_pref_nodes = 10
@@ -588,14 +604,12 @@ with open(output_csv_file, 'w', newline='') as csvfile:
                 optimization_problem.model.write("mymodel.lp")
 
                 if optimization_problem.model.status == GRB.OPTIMAL:
-                    # 假设你已经设置了多个目标，下面是打印所有目标的值的代码
-                    num_of_objectives = optimization_problem.model.NumObj  # 获取目标函数的数量
+                    # num_of_objectives = optimization_problem.model.NumObj  # 获取目标函数的数量
 
-                    # 遍历所有目标并打印其值
-                    for i in range(num_of_objectives):
-                        obj_value = optimization_problem.model.getObjective(i).getValue()
-                        print(f"Objective {i} value: {obj_value}")
-                    total_cost = optimization_problem.model.getObjective(1).getValue()
+                    # for i in range(num_of_objectives):
+                    #     obj_value = optimization_problem.model.getObjective(i).getValue()
+                    #     print(f"Objective {i} value: {obj_value}")
+                    total_cost = optimization_problem.model.getObjective().getValue()
 
                     # total_cost = pulp.value(prob.objective)
 
