@@ -103,11 +103,13 @@ class PreferenceGenerator:
 
 
 class OptimizationProblem:
-    def __init__(self, G, node_stations, preferred_station, M, speed_dict, user_preference, congestion=1):
+    def __init__(self, G, node_stations, preferred_station, M, speed_dict, user_preference, source, destination, congestion=1):
         self.G = G
         self.node_stations = node_stations
         self.preferred_station = preferred_station
         self.M = M
+        self.source = source
+        self.destination = destination
         self.speed_dict = speed_dict
         self.user_preference = user_preference  # user_preference = ['eb', 'ec', 'es']
         self.congestion = congestion
@@ -128,7 +130,10 @@ class OptimizationProblem:
             raise ValueError("Model is not initialized. Call setup_model() first.")
 
         for i, j in self.G.edges():
-            for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
+            stations = set(self.node_stations[i]).intersection(self.node_stations[j])
+            if i != self.source or j != self.destination:
+                stations = stations - {'walk'}
+            for s in stations:
                 var_name = f"path_{i}_{j}_{s}"
                 self.paths[i, j, s] = self.model.addVar(vtype=GRB.BINARY, name=var_name)
 
@@ -325,7 +330,10 @@ class OptimizationProblem:
                         )
 
         for i, j in self.G.edges():
-            for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
+            stations = set(self.node_stations[i]).intersection(self.node_stations[j])
+            if i != self.source or j != self.destination:
+                stations = stations - {'walk'}
+            for s in stations:
                 energy_consumption = self.energy_constraints[i, j, s]
 
                 self.model.addConstr(
@@ -588,7 +596,7 @@ with open(output_csv_file, 'w', newline='') as csvfile:
 
             # Set up and solve the optimization problem
             optimization_problem = OptimizationProblem(reduced_G, node_stations, preferred_station, M, speed_dict,
-                                                       user_preference)
+                                                       user_preference, start_node, end_node)
             optimization_problem.setup_model()
             optimization_problem.setup_decision_variables()
             optimization_problem.setup_costs()
