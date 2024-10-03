@@ -131,7 +131,7 @@ class OptimizationProblem:
 
         for i, j in self.G.edges():
             stations = set(self.node_stations[i]).intersection(self.node_stations[j])
-            if i != self.source or j != self.destination:
+            if i != self.source and j != self.destination:
                 stations = stations - {'walk'}
             for s in stations:
                 var_name = f"path_{i}_{j}_{s}"
@@ -263,10 +263,10 @@ class OptimizationProblem:
                 self.energy_constraints[i, j, s] = self.calculate_energy(s, edge_weight)
 
     def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes):
-        # obj_time_min = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
-        #                gp.quicksum(
-        #                    self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
-        #                    self.station_changes)
+        obj_time_min = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
+                       gp.quicksum(
+                           self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
+                           self.station_changes)
         obj_fees_min = gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths)
         # obj_walking_distance_min = gp.quicksum(self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
         # obj_safety_scores_max = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
@@ -283,8 +283,8 @@ class OptimizationProblem:
         #                              reltol=objs_dict[i]['relative tolerance'],
         #                              weight=objs_dict[i]['weight'])
         # self.model.setObjective(obj_safety_scores_max, gp.GRB.MAXIMIZE)
-        # self.model.setObjective(obj_time_min, gp.GRB.MINIMIZE)
-        self.model.setObjective(obj_fees_min, gp.GRB.MINIMIZE)
+        self.model.setObjective(obj_time_min, gp.GRB.MINIMIZE)
+        # self.model.setObjective(obj_fees_min, gp.GRB.MINIMIZE)
 
         for i in self.G.nodes:
             for s in self.node_stations[i]:
@@ -331,7 +331,7 @@ class OptimizationProblem:
 
         for i, j in self.G.edges():
             stations = set(self.node_stations[i]).intersection(self.node_stations[j])
-            if i != self.source or j != self.destination:
+            if i != self.source and j != self.destination:
                 stations = stations - {'walk'}
             for s in stations:
                 energy_consumption = self.energy_constraints[i, j, s]
@@ -386,14 +386,13 @@ class PathFinder:
             # Look for the next path step
             for (i, j, s) in self.paths:
                 if i == current_node and s == current_mode and self.paths[i, j, s].X == 1:
-                    # print("yes================")
                     path_cost = self.costs[i, j, s]
                     energy_consumption = self.energy_constraints[i, j, s]
                     path_sequence.append((i, j, s, path_cost, energy_consumption))
                     energy_consumption_sequence.append((i, j, s, energy_consumption))
                     current_node = j
                     next_step_found = True
-
+                    break
 
             # Look for the next station change
             for (i, s1, s2) in self.station_changes:
@@ -407,7 +406,7 @@ class PathFinder:
             # Check if destination is reached
             if current_node == end_node and current_mode == end_station:
                 destination_reached = True
-            else:
+            elif not next_step_found:
                 print("Destination not reached. Path may be incomplete.")
                 break
 
