@@ -202,7 +202,7 @@ class OptimizationProblem:
             'ec': 0.05,  # 电动汽车每公里成本
             'eb': 0.01,  # 电动自行车每公里成本
             'es': 0.02,  # 电动滑板车每公里成本
-            'walk': 0.001  # 步行每公里成本
+            'walk': 0  # 步行每公里成本
         }
 
         # 利润率
@@ -470,7 +470,7 @@ class ShortestPathComputer:
 
 class ReducedGraphCreator:
     def __init__(self, graph, start_node, dest_node, preference_stations, shortest_routes_start, shortest_routes_dest,
-                 all_shortest_routes_pairs, shortest_route_start_end):
+                 all_shortest_routes_pairs):
         self.graph = graph
         self.start_node = start_node
         self.dest_node = dest_node
@@ -478,7 +478,7 @@ class ReducedGraphCreator:
         self.shortest_routes_start = shortest_routes_start
         self.shortest_routes_dest = shortest_routes_dest
         self.all_shortest_routes_pairs = all_shortest_routes_pairs
-        self.shortest_route_start_end = shortest_route_start_end
+        # self.shortest_route_start_end = shortest_route_start_end
 
     def create_new_graph(self):
         new_graph = nx.DiGraph()
@@ -503,8 +503,8 @@ class ReducedGraphCreator:
             except KeyError:
                 pass
 
-        if self.shortest_route_start_end is not None:
-            new_graph.add_edge(self.start_node, self.dest_node, weight=self.shortest_route_start_end[1])
+        # if self.shortest_route_start_end is not None:
+        #     new_graph.add_edge(self.start_node, self.dest_node, weight=self.shortest_route_start_end[1])
 
         return new_graph
 
@@ -586,11 +586,14 @@ with open(output_csv_file, 'w', newline='') as csvfile:
             shortest_routes_dest = shortest_path_computer.compute_shortest_paths_dest(end_node, preferred_nodes)
 
             # compute shortest route between start and end
-            shortest_route_start_end = shortest_path_computer.compute_shortest_path_start_end(start_node, end_node)
+            # shortest_route_start_end = shortest_path_computer.compute_shortest_path_start_end(start_node, end_node)
             # Create a new reduced graph
             reduced_graph_creator = ReducedGraphCreator(original_G, start_node, end_node, preferred_nodes,
                                                         shortest_routes_start, shortest_routes_dest,
-                                                        all_shortest_routes_pairs, shortest_route_start_end)
+                                                        all_shortest_routes_pairs)
+            # reduced_graph_creator = ReducedGraphCreator(original_G, start_node, end_node, preferred_nodes,
+            #                                             shortest_routes_start, shortest_routes_dest,
+            #                                             all_shortest_routes_pairs, shortest_route_start_end)
             reduced_G = reduced_graph_creator.create_new_graph()
 
             # Set up and solve the optimization problem
