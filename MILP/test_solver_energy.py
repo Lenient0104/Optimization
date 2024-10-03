@@ -283,8 +283,8 @@ class OptimizationProblem:
         #                              reltol=objs_dict[i]['relative tolerance'],
         #                              weight=objs_dict[i]['weight'])
         # self.model.setObjective(obj_safety_scores_max, gp.GRB.MAXIMIZE)
-        self.model.setObjective(obj_time_min, gp.GRB.MINIMIZE)
-        # self.model.setObjective(obj_fees_min, gp.GRB.MINIMIZE)
+        # self.model.setObjective(obj_time_min, gp.GRB.MINIMIZE)
+        self.model.setObjective(obj_fees_min, gp.GRB.MINIMIZE)
 
         for i in self.G.nodes:
             for s in self.node_stations[i]:
