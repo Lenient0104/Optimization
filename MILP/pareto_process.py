@@ -5,7 +5,7 @@ matplotlib.use('macOSX')  # 或者 'Qt5Agg', 'macOSX' 等，根据您的系统�
 import matplotlib.pyplot as plt
 
 # 读取CSV文件
-df = pd.read_csv('pareto_values.csv')
+df = pd.read_csv('pareto_values1004.csv')
 
 # Dropping duplicates
 df_unique = df.drop_duplicates()
