@@ -270,21 +270,21 @@ class OptimizationProblem:
         obj_fees_min = gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths)
         # obj_walking_distance_min = gp.quicksum(self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
         # obj_safety_scores_max = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
-        # objs_dict = {1: {'objective': obj_time_min, 'priority': 2, 'relative tolerance': 0.01, 'weight': 0.00000001},
-        #              # 2: {'objective': obj_fees_min, 'priority': 2, 'relative tolerance': 0.01, 'weight': 1},
-        #              # 3: {'objective': obj_walking_distance_min, 'priority': 3, 'relative tolerance': 0.01, 'weight': 1},
-        #              2: {'objective': obj_safety_scores_max, 'priority': 1, 'relative tolerance': 0.01, 'weight': -1}
-        #              }
+        # objs_dict = {1: {'objective': obj_time_min, 'priority': 2, 'reltol': 0.01},
+        #              2: {'objective': obj_fees_min, 'priority': 1},
+                     # 3: {'objective': obj_walking_distance_min, 'priority': 3, 'relative tolerance': 0.01, 'weight': 1},
+                     # 2: {'objective': obj_safety_scores_max, 'priority': 1, 'relative tolerance': 0.01, 'weight': -1}
+                     # }
 
         # self.model.ModelSense = gp.GRB.MINIMIZE
         # for i in objs_dict:
         #     self.model.setObjectiveN(objs_dict[i]['objective'], index=i,
-        #                              priority=objs_dict[i]['priority'],
-        #                              reltol=objs_dict[i]['relative tolerance'],
-        #                              weight=objs_dict[i]['weight'])
+        #                              priority=objs_dict[i]['priority'])
+        self.model.setObjectiveN(obj_time_min, index=0, priority=2, name="Obj1", reltol=0.01)
+        self.model.setObjectiveN(obj_fees_min, index=1, priority=1, name="Obj2")
         # self.model.setObjective(obj_safety_scores_max, gp.GRB.MAXIMIZE)
         # self.model.setObjective(obj_time_min, gp.GRB.MINIMIZE)
-        self.model.setObjective(obj_fees_min, gp.GRB.MINIMIZE)
+        # self.model.setObjective(obj_fees_min, gp.GRB.MINIMIZE)
 
         for i in self.G.nodes:
             for s in self.node_stations[i]:
@@ -350,6 +350,9 @@ class OptimizationProblem:
 
     def solve(self):
         start_time = time.time()
+        # 设定多目标优化的参数
+        # self.model.setParam(GRB.Param.ObjNumber, 1)
+        # self.model.ObjNRelTol = 0.01
         self.model.optimize()
         end_time = time.time()
 
@@ -366,12 +369,42 @@ class OptimizationProblem:
 
 
 class PathFinder:
-    def __init__(self, paths, station_changes, costs, station_change_costs, energy_constraints):
+    def __init__(self, G, paths, station_changes, costs, station_change_costs, energy_constraints):
+        self.G = G
         self.paths = paths  # Gurobi decision variables for paths
         self.station_changes = station_changes  # Gurobi decision variables for station changes
         self.costs = costs  # Costs associated with paths
         self.station_change_costs = station_change_costs  # Costs associated with station changes
         self.energy_constraints = energy_constraints
+
+    def calculate_fees(self, path):
+        fees = 0
+        cost_coefficients = {
+            'ec': 0.05,  # 电动汽车每公里成本
+            'eb': 0.01,  # 电动自行车每公里成本
+            'es': 0.02,  # 电动滑板车每公里成本
+            'walk': 0  # 步行每公里成本
+        }
+
+        # 利润率
+        profit_margins = {
+            'ec': 0.15,
+            'eb': 0.10,
+            'es': 0.12,
+            'walk': 0
+        }
+
+        for sequence in path:
+            if len(sequence) == 5:
+                i = sequence[0]
+                j = sequence[1]
+                s = sequence[2]
+                dis = self.G[i][j]['weight']
+                base_cost = cost_coefficients[s] * dis
+                fees = fees + base_cost * (1 + profit_margins[s])
+
+        return fees
+
 
     def generate_path_sequence(self, start_node, start_station, end_node, end_station):
         current_node, current_mode = start_node, start_station
@@ -410,7 +443,7 @@ class PathFinder:
                 print("Destination not reached. Path may be incomplete.")
                 break
 
-        return path_sequence, station_change_count
+        return path_sequence, station_change_count, self.calculate_fees(path_sequence)
 
 
 class ShortestPathComputer:
@@ -614,21 +647,22 @@ with open(output_csv_file, 'w', newline='') as csvfile:
                 optimization_problem.model.write("mymodel.lp")
 
                 if optimization_problem.model.status == GRB.OPTIMAL:
-                    # num_of_objectives = optimization_problem.model.NumObj  # 获取目标函数的数量
+                    num_of_objectives = optimization_problem.model.NumObj  # 获取目标函数的数量
 
-                    # for i in range(num_of_objectives):
-                    #     obj_value = optimization_problem.model.getObjective(i).getValue()
-                    #     print(f"Objective {i} value: {obj_value}")
+                    for i in range(num_of_objectives):
+                        obj_value = optimization_problem.model.getObjective(i).getValue()
+                        print(f"Objective {i} value: {obj_value}")
                     total_cost = optimization_problem.model.getObjective().getValue()
 
                     # total_cost = pulp.value(prob.objective)
 
-                    path_finder = PathFinder(optimization_problem.paths, optimization_problem.station_changes,
+                    path_finder = PathFinder(reduced_G, optimization_problem.paths, optimization_problem.station_changes,
                                              optimization_problem.costs,
                                              optimization_problem.station_change_costs,
                                              optimization_problem.energy_constraints)
-                    path_sequence, station_change_count = path_finder.generate_path_sequence(start_node, 'walk',
+                    path_sequence, station_change_count, fees = path_finder.generate_path_sequence(start_node, 'walk',
                                                                                              end_node, 'walk')
+                    print("fees:", fees)
 
                     end_time = time.time()
                     Total_time = end_time - initial_time
