@@ -16,8 +16,9 @@ df_unique = df_unique.sort_values(by="Time cost")
 # Plotting line plot
 plt.figure(figsize=(10, 6))
 plt.plot(df_unique["Time cost"], df_unique["Fees"], marker='o')  # 添加 marker='o' 以显示每个点的位置
-plt.xlabel('Time cost')
-plt.ylabel('Fees')
-plt.title('Line Plot of Time Cost vs Fees')
+plt.xlabel('Time cost (s)')
+plt.ylabel('Fees (€)')
+plt.title('Pareto front of Time Cost vs Fees')
 plt.grid(True)
+plt.savefig('pareto front')
 plt.show()
