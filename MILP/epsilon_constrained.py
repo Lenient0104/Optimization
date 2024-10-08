@@ -194,8 +194,10 @@ class OptimizationProblem:
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
                 if s == 'walk':
                     self.walk_distances[i, j, s] = edge_weight
+                elif s == 'eb' or s == 'es':
+                    self.walk_distances[i, j, s] = edge_weight * 0.01
                 else:
-                    self.walk_distances[i, j, s] = 0
+                    self.walk_distances[i, j, s] = edge_weight * 0.001
 
     def set_up_fees(self):
         self.fees = {}
