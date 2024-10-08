@@ -104,7 +104,8 @@ class PreferenceGenerator:
 
 
 class OptimizationProblem:
-    def __init__(self, G, node_stations, preferred_station, M, speed_dict, user_preference, source, destination, congestion=1):
+    def __init__(self, G, node_stations, preferred_station, M, speed_dict, user_preference, source, destination,
+                 congestion=1):
         self.G = G
         self.node_stations = node_stations
         self.preferred_station = preferred_station
@@ -214,15 +215,6 @@ class OptimizationProblem:
             'walk': 0
         }
 
-        # for i, j in self.G.edges():
-        #     edge_weight = self.G[i][j]['weight']
-        #     for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
-        #         if s not in self.user_preference and s != 'walk':
-        #             self.fees[i, j, s] = 1e7
-        #         else:
-        #             base_cost = cost_coefficients[s] * edge_weight
-        #             self.fees[i, j, s] = base_cost * (1 + profit_margins[s])
-
         for i, j in self.G.edges():
             edge_weight = self.G[i][j]['weight']
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
@@ -235,6 +227,7 @@ class OptimizationProblem:
                 else:
                     base_cost = cost_coefficients[s] * edge_weight / 1000
                     self.fees[i, j, s] = base_cost + profit_margins[s] * edge_weight / 1000
+
     def set_up_safety(self):
         self.safety_scores = {}
         safety_level = {
@@ -268,19 +261,19 @@ class OptimizationProblem:
                            self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
                            self.station_changes)
         obj_fees_min = gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths)
-        # obj_walking_distance_min = gp.quicksum(self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
-        # obj_safety_scores_max = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
-        # objs_dict = {1: {'objective': obj_time_min, 'priority': 2, 'reltol': 0.01},
-        #              2: {'objective': obj_fees_min, 'priority': 1},
-                     # 3: {'objective': obj_walking_distance_min, 'priority': 3, 'relative tolerance': 0.01, 'weight': 1},
-                     # 2: {'objective': obj_safety_scores_max, 'priority': 1, 'relative tolerance': 0.01, 'weight': -1}
-                     # }
+        obj_walking_distance_min = gp.quicksum(self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
+        obj_safety_scores_max = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
 
-        self.model.ModelSense = gp.GRB.MINIMIZE
+        # objs_dict = {1: {'objective': obj_time_min, 'priority': 2, 'reltol': 0.01},
+        # 2: {'objective': obj_fees_min, 'priority': 1}, 3: {'objective': obj_walking_distance_min, 'priority': 3,
+        # 'relative tolerance': 0.01, 'weight': 1}, 2: {'objective': obj_safety_scores_max, 'priority': 1,
+        # 'relative tolerance': 0.01, 'weight': -1} }
+
+        # self.model.ModelSense = gp.GRB.MAXIMIZE
         # for i in objs_dict:
         #     self.model.setObjectiveN(objs_dict[i]['objective'], index=i,
         #                              priority=objs_dict[i]['priority'])
-        self.model.setObjective(obj_time_min)
+        self.model.setObjective(obj_walking_distance_min, gp.GRB.MINIMIZE)
         # self.model.setObjectiveN(obj_fees_min, index=1, priority=1, name="Obj2")
         # self.model.setObjective(obj_safety_scores_max, gp.GRB.MAXIMIZE)
         # self.model.setObjective(obj_time_min, gp.GRB.MINIMIZE)
@@ -312,9 +305,9 @@ class OptimizationProblem:
 
         self.model.addConstr(gp.quicksum(self.station_changes.values()) <= max_station_changes,
                              name="max_station_changes")
-        self.model.addConstr(gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths) >= 0, name="fees>=zero")
-        self.model.addConstr(gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths) <= 8.787903000000002,
-                             name="fees<=12.400911")
+        # self.model.addConstr(gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths) >= 0, name="fees>=zero")
+        # self.model.addConstr(gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths) <= 8.787903000000002,
+        #                      name="fees<=12.400911")
 
         # self.model.addConstr(gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
         #                gp.quicksum(
@@ -418,6 +411,38 @@ class PathFinder:
 
         return fees
 
+    def calculate_time(self, path):
+        time_cost = 0
+        for sequence in path:
+            t = sequence[3]
+            time_cost = time_cost + t
+        return time_cost
+
+    def calculate_safety_level(self, path):
+        safety = 0
+        safety_level = {
+            'es': 1,
+            'eb': 2,
+            'ec': 3,
+            'walk': 4
+        }
+        for sequence in path:
+            if len(sequence) == 5:
+                s = sequence[2]
+                safety = safety + safety_level[s]
+        return safety
+
+    def calculate_walking_distance(self, path):
+        walking_distance = 0
+        for sequence in path:
+            if len(sequence) == 5:
+                i = sequence[0]
+                j = sequence[1]
+                s = sequence[2]
+                if s == 'walk':
+                    dis = self.G[i][j]['weight']
+                    walking_distance = walking_distance + dis
+        return walking_distance
 
     def generate_path_sequence(self, start_node, start_station, end_node, end_station):
         current_node, current_mode = start_node, start_station
@@ -456,7 +481,8 @@ class PathFinder:
                 print("Destination not reached. Path may be incomplete.")
                 break
 
-        return path_sequence, station_change_count, self.calculate_fees(path_sequence)
+        return path_sequence, station_change_count, self.calculate_fees(path_sequence), \
+               self.calculate_time(path_sequence), self.calculate_safety_level(path_sequence), self.calculate_walking_distance(path_sequence)
 
 
 class ShortestPathComputer:
@@ -662,8 +688,8 @@ with open(output_csv_file, 'w', newline='') as csvfile:
                 optimization_problem.model.write("mymodel.lp")
 
                 if optimization_problem.model.status == GRB.OPTIMAL:
-                    num_of_objectives = optimization_problem.model.NumObj  # 获取目标函数的数量
-                    obj_values = []
+                    # num_of_objectives = optimization_problem.model.NumObj  # 获取目标函数的数量
+                    # obj_values = []
                     # for i in range(num_of_objectives):
                     #     obj_value = optimization_problem.model.getObjective(i).getValue()
                     #     obj_values.append(obj_value)
@@ -679,13 +705,19 @@ with open(output_csv_file, 'w', newline='') as csvfile:
 
                     # total_cost = pulp.value(prob.objective)
 
-                    path_finder = PathFinder(reduced_G, optimization_problem.paths, optimization_problem.station_changes,
+                    path_finder = PathFinder(reduced_G, optimization_problem.paths,
+                                             optimization_problem.station_changes,
                                              optimization_problem.costs,
                                              optimization_problem.station_change_costs,
                                              optimization_problem.energy_constraints)
-                    path_sequence, station_change_count, fees = path_finder.generate_path_sequence(start_node, 'walk',
-                                                                                             end_node, 'walk')
+                    path_sequence, station_change_count, fees, total_time, safety, walking_distance = path_finder.generate_path_sequence(start_node,
+                                                                                                         'walk',
+                                                                                                         end_node,
+                                                                                                         'walk')
+                    print("time:", total_time)
                     print("fees:", fees)
+                    print("safety:", safety)
+                    print("walking distance", walking_distance)
 
                     end_time = time.time()
                     Total_time = end_time - initial_time

@@ -90,9 +90,8 @@ class PreferenceGenerator:
                 # num_preferred = random.randint(1, len(self.station_types) - 1)
                 # preferred_types = [st for st in self.station_types if st != 'walk']
                 # 为每个站点生成唯一的 station_types 列表
-                # num_preferred = random.randint(1, len(self.station_types))  # 随机生成 1 到全部 station_types
-                # preferred_types = random.sample(self.station_types, num_preferred)
-                preferred_types = ['eb', 'es', 'ec', 'walk']
+                num_preferred = random.randint(1, len(self.station_types))  # 随机生成 1 到全部 station_types
+                preferred_types = random.sample(self.station_types, num_preferred)
                 preferred_station[i] = preferred_types  # random.sample(preferred_types, num_preferred)
                 if 'walk' not in preferred_station[i]:
                     preferred_station[i].append('walk')
@@ -104,8 +103,7 @@ class PreferenceGenerator:
 
 
 class OptimizationProblem:
-    def __init__(self, G, node_stations, preferred_station, M, speed_dict, user_preference, source, destination,
-                 congestion=1):
+    def __init__(self, G, node_stations, preferred_station, M, speed_dict, user_preference, source, destination, congestion=1):
         self.G = G
         self.node_stations = node_stations
         self.preferred_station = preferred_station
@@ -270,10 +268,23 @@ class OptimizationProblem:
                            self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
                            self.station_changes)
         obj_fees_min = gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths)
-        # obj_walking_distance_min = gp.quicksum(self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
+        obj_walking_distance_min = gp.quicksum(self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
         # obj_safety_scores_max = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
+        # objs_dict = {1: {'objective': obj_time_min, 'priority': 2, 'relative tolerance': 0.01, 'weight': 0.00000001},
+        #              # 2: {'objective': obj_fees_min, 'priority': 2, 'relative tolerance': 0.01, 'weight': 1},
+        #              # 3: {'objective': obj_walking_distance_min, 'priority': 3, 'relative tolerance': 0.01, 'weight': 1},
+        #              2: {'objective': obj_safety_scores_max, 'priority': 1, 'relative tolerance': 0.01, 'weight': -1}
+        #              }
 
-        self.model.setObjective(obj_time_min, gp.GRB.MINIMIZE)
+        # self.model.ModelSense = gp.GRB.MINIMIZE
+        # for i in objs_dict:
+        #     self.model.setObjectiveN(objs_dict[i]['objective'], index=i,
+        #                              priority=objs_dict[i]['priority'],
+        #                              reltol=objs_dict[i]['relative tolerance'],
+        #                              weight=objs_dict[i]['weight'])
+        # self.model.setObjective(obj_safety_scores_max, gp.GRB.MAXIMIZE)
+        # self.model.setObjective(obj_time_min, gp.GRB.MINIMIZE)
+        self.model.setObjective(obj_walking_distance_min, gp.GRB.MINIMIZE)
 
         for i in self.G.nodes:
             for s in self.node_stations[i]:
@@ -527,109 +538,106 @@ node_stations[end_node] = ['walk']
 no_pref_nodes = 10
 max_station_changes = 5
 M = 1e6
-results = []
-for i in range(0, 100):
-    # route_finder = RouteFinder(original_G)
-    # Generate preferred station types for each node (execute only once)
-    preference_generator = PreferenceGenerator(original_G, station_types)
-    preferred_station, preferred_nodes = preference_generator.generate_node_preferences()
 
-    # Compute shortest routes pairs (execute only once)
-    shortest_path_computer = ShortestPathComputer(original_G)
-    # all_shortest_routes_pairs = shortest_path_computer.compute_shortest_paths_pairs(preferred_nodes)
+# route_finder = RouteFinder(original_G)
 
-    # Load speed data from JSON
-    with open(speed_file_path, 'r') as f:
-        speed_data = json.load(f)
 
-    # Create a dictionary for speed data
-    speed_dict = {entry['edge_id']: {'pedestrian_speed': float(entry['pedestrian_speed']),
-                                     'bike_speed': float(entry['bike_speed']),
-                                     'car_speed': float(entry['car_speed'])}
-                  for entry in speed_data}
+# Generate preferred station types for each node (execute only once)
+preference_generator = PreferenceGenerator(original_G, station_types)
+preferred_station, preferred_nodes = preference_generator.generate_node_preferences()
 
-    # Prepare the output CSV file
-    with open(output_csv_file, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(['Start Node', 'End Node', 'Total Cost', 'Execution Time', 'Optimal Path Sequence',
-                         'Final Route Mapping to original'])
+# Compute shortest routes pairs (execute only once)
+shortest_path_computer = ShortestPathComputer(original_G)
+# all_shortest_routes_pairs = shortest_path_computer.compute_shortest_paths_pairs(preferred_nodes)
 
-        # Read OD pairs from CSV file and execute the main loop
-        with open(od_pairs_file, 'r') as odfile:
-            reader = csv.reader(odfile)
-            # next(reader)  # Skip header row if present
-            for row in reader:
+# Load speed data from JSON
+with open(speed_file_path, 'r') as f:
+    speed_data = json.load(f)
 
-                initial_time = time.time()
+# Create a dictionary for speed data
+speed_dict = {entry['edge_id']: {'pedestrian_speed': float(entry['pedestrian_speed']),
+                                 'bike_speed': float(entry['bike_speed']),
+                                 'car_speed': float(entry['car_speed'])}
+              for entry in speed_data}
 
-                start_node, end_node = row  # Extract start_node and end_node from the current row
+# Prepare the output CSV file
+with open(output_csv_file, 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(['Start Node', 'End Node', 'Total Cost', 'Execution Time', 'Optimal Path Sequence',
+                     'Final Route Mapping to original'])
 
-                # Compute shortest route pairs for testing only - otherwise outside the loop
-                all_shortest_routes_pairs = shortest_path_computer.compute_shortest_paths_pairs(preferred_nodes)
+    # Read OD pairs from CSV file and execute the main loop
+    with open(od_pairs_file, 'r') as odfile:
+        reader = csv.reader(odfile)
+        # next(reader)  # Skip header row if present
+        for row in reader:
 
-                # Compute shortest routes start
-                shortest_routes_start = shortest_path_computer.compute_shortest_paths_start(start_node, preferred_nodes)
+            initial_time = time.time()
 
-                # Compute shortest routes dest
-                shortest_routes_dest = shortest_path_computer.compute_shortest_paths_dest(end_node, preferred_nodes)
+            start_node, end_node = row  # Extract start_node and end_node from the current row
 
-                # compute shortest route between start and end
-                # shortest_route_start_end = shortest_path_computer.compute_shortest_path_start_end(start_node, end_node)
-                # Create a new reduced graph
-                reduced_graph_creator = ReducedGraphCreator(original_G, start_node, end_node, preferred_nodes,
-                                                            shortest_routes_start, shortest_routes_dest,
-                                                            all_shortest_routes_pairs)
-                # reduced_graph_creator = ReducedGraphCreator(original_G, start_node, end_node, preferred_nodes,
-                #                                             shortest_routes_start, shortest_routes_dest,
-                #                                             all_shortest_routes_pairs, shortest_route_start_end)
+            # Compute shortest route pairs for testing only - otherwise outside the loop
+            all_shortest_routes_pairs = shortest_path_computer.compute_shortest_paths_pairs(preferred_nodes)
 
-                reduced_G = reduced_graph_creator.create_new_graph()
+            # Compute shortest routes start
+            shortest_routes_start = shortest_path_computer.compute_shortest_paths_start(start_node, preferred_nodes)
 
-                # Set up and solve the optimization problem
-                optimization_problem = OptimizationProblem(reduced_G, node_stations, preferred_station, M, speed_dict,
-                                                           user_preference, start_node, end_node)
-                optimization_problem.setup_model()
-                optimization_problem.setup_decision_variables()
-                optimization_problem.setup_costs()
-                optimization_problem.set_up_fees()
-                optimization_problem.set_up_walking_distance()
-                optimization_problem.set_up_safety()
-                optimization_problem.setup_energy_constraints(50)
-                optimization_problem.setup_problem(start_node, 'walk', end_node, 'walk', max_station_changes)
+            # Compute shortest routes dest
+            shortest_routes_dest = shortest_path_computer.compute_shortest_paths_dest(end_node, preferred_nodes)
 
-                try:
-                    # Solve the problem and measure execution time
-                    prob, execution_time = optimization_problem.solve()
-                    optimization_problem.model.write("mymodel.lp")
+            # compute shortest route between start and end
+            # shortest_route_start_end = shortest_path_computer.compute_shortest_path_start_end(start_node, end_node)
+            # Create a new reduced graph
+            reduced_graph_creator = ReducedGraphCreator(original_G, start_node, end_node, preferred_nodes,
+                                                        shortest_routes_start, shortest_routes_dest,
+                                                        all_shortest_routes_pairs)
+            # reduced_graph_creator = ReducedGraphCreator(original_G, start_node, end_node, preferred_nodes,
+            #                                             shortest_routes_start, shortest_routes_dest,
+            #                                             all_shortest_routes_pairs, shortest_route_start_end)
+            reduced_G = reduced_graph_creator.create_new_graph()
 
-                    if optimization_problem.model.status == GRB.OPTIMAL:
-                        # num_of_objectives = optimization_problem.model.NumObj  # 获取目标函数的数量
+            # Set up and solve the optimization problem
+            optimization_problem = OptimizationProblem(reduced_G, node_stations, preferred_station, M, speed_dict,
+                                                       user_preference, start_node, end_node)
+            optimization_problem.setup_model()
+            optimization_problem.setup_decision_variables()
+            optimization_problem.setup_costs()
+            optimization_problem.set_up_fees()
+            optimization_problem.set_up_walking_distance()
+            optimization_problem.set_up_safety()
+            optimization_problem.setup_energy_constraints(50)
+            optimization_problem.setup_problem(start_node, 'walk', end_node, 'walk', max_station_changes)
 
-                        # for i in range(num_of_objectives):
-                        #     obj_value = optimization_problem.model.getObjective(i).getValue()
-                        #     print(f"Objective {i} value: {obj_value}")
-                        total_cost = optimization_problem.model.getObjective().getValue()
-                        results.append(total_cost)
-                        print('optimal value', total_cost)
+            try:
+                # Solve the problem and measure execution time
+                prob, execution_time = optimization_problem.solve()
+                optimization_problem.model.write("mymodel.lp")
 
-                        # total_cost = pulp.value(prob.objective)
+                if optimization_problem.model.status == GRB.OPTIMAL:
+                    # num_of_objectives = optimization_problem.model.NumObj  # 获取目标函数的数量
 
-                        path_finder = PathFinder(optimization_problem.paths, optimization_problem.station_changes,
-                                                 optimization_problem.costs,
-                                                 optimization_problem.station_change_costs,
-                                                 optimization_problem.energy_constraints)
-                        path_sequence, station_change_count = path_finder.generate_path_sequence(start_node, 'walk',
-                                                                                                 end_node, 'walk')
+                    # for i in range(num_of_objectives):
+                    #     obj_value = optimization_problem.model.getObjective(i).getValue()
+                    #     print(f"Objective {i} value: {obj_value}")
+                    total_cost = optimization_problem.model.getObjective().getValue()
 
-                        end_time = time.time()
-                        Total_time = end_time - initial_time
+                    # total_cost = pulp.value(prob.objective)
 
-                        # Write results to CSV
-                        writer.writerow([start_node, end_node, total_cost, Total_time, path_sequence])
-                    else:
-                        # Write results to CSV with 'inf' for total cost if no optimal solution is found
-                        writer.writerow([start_node, end_node, 'inf', 'No optimal solution found'])
-                except pulp.PulpSolverError:
-                    # Write results to CSV with 'inf' for total cost if solver fails
-                    writer.writerow([start_node, end_node, 'inf', 'Solver failed'])
-            print(results)
+                    path_finder = PathFinder(optimization_problem.paths, optimization_problem.station_changes,
+                                             optimization_problem.costs,
+                                             optimization_problem.station_change_costs,
+                                             optimization_problem.energy_constraints)
+                    path_sequence, station_change_count = path_finder.generate_path_sequence(start_node, 'walk',
+                                                                                             end_node, 'walk')
+
+                    end_time = time.time()
+                    Total_time = end_time - initial_time
+
+                    # Write results to CSV
+                    writer.writerow([start_node, end_node, total_cost, Total_time, path_sequence])
+                else:
+                    # Write results to CSV with 'inf' for total cost if no optimal solution is found
+                    writer.writerow([start_node, end_node, 'inf', 'No optimal solution found'])
+            except pulp.PulpSolverError:
+                # Write results to CSV with 'inf' for total cost if solver fails
+                writer.writerow([start_node, end_node, 'inf', 'Solver failed'])
