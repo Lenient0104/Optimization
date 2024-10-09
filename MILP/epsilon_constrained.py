@@ -120,8 +120,11 @@ class OptimizationProblem:
         self.energy_constraints = {}
         self.station_changes = {}
         self.costs = {}
+        self.fees = {}
         self.energy_vars = {}
         self.station_change_costs = {}
+        self.walk_distances = {}
+        self.safety_scores = {}
 
     def setup_model(self):
         # 初始化 Gurobi 模型
@@ -188,7 +191,6 @@ class OptimizationProblem:
                             self.station_change_costs[i, s1, s2] = self.M
 
     def set_up_walking_distance(self):
-        self.walk_distances = {}
         for i, j in self.G.edges():
             edge_weight = self.G[i][j]['weight']
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
@@ -200,7 +202,6 @@ class OptimizationProblem:
                     self.walk_distances[i, j, s] = edge_weight * 0.001
 
     def set_up_fees(self):
-        self.fees = {}
         # 成本系数
         cost_coefficients = {
             'ec': 0.9,  # 电动汽车每公里成本
@@ -230,17 +231,28 @@ class OptimizationProblem:
                     base_cost = cost_coefficients[s] * edge_weight / 1000
                     self.fees[i, j, s] = base_cost + profit_margins[s] * edge_weight / 1000
 
-    def set_up_safety(self):
-        self.safety_scores = {}
-        safety_level = {
-            'es': 1,
-            'eb': 2,
-            'ec': 3,
-            'walk': 4
+    def set_up_risk(self):
+        risky_level = {
+            'es': 4,
+            'eb': 3,
+            'ec': 2,
+            'walk': 1
         }
         for i, j in self.G.edges():
+            edge_weight = self.G[i][j]['weight']
+            # edge_id = i
+            # speeds = self.speed_dict[edge_id]
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
-                self.safety_scores[i, j, s] = safety_level[s]
+                # if s != 'walk':
+                #     if s not in self.user_preference:
+                #         self.safety_scores[i, j, s] = -1e7
+                #     else:
+                #         speed = speeds.get('bike_speed' if s in ['eb', 'es'] else 'car_speed', 0)
+                #         self.safety_scores[i, j, s] = (safety_level[s] / (speed * edge_weight)) * 1000
+                # else:
+                #     pedestrian_speed = speeds.get('pedestrian_speed', 0)
+                #     self.safety_scores[i, j, s] = (safety_level[s] / (pedestrian_speed * edge_weight)) * 1000
+                self.safety_scores[i, j, s] = risky_level[s]
 
     def calculate_energy(self, s, d):
         ENERGY_CONSUMPTION_RATES = {
@@ -264,7 +276,7 @@ class OptimizationProblem:
                            self.station_changes)
         obj_fees_min = gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths)
         obj_walking_distance_min = gp.quicksum(self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
-        obj_safety_scores_max = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
+        obj_safety_scores_min = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
 
         # objs_dict = {1: {'objective': obj_time_min, 'priority': 2, 'reltol': 0.01},
         # 2: {'objective': obj_fees_min, 'priority': 1}, 3: {'objective': obj_walking_distance_min, 'priority': 3,
@@ -275,7 +287,7 @@ class OptimizationProblem:
         # for i in objs_dict:
         #     self.model.setObjectiveN(objs_dict[i]['objective'], index=i,
         #                              priority=objs_dict[i]['priority'])
-        self.model.setObjective(obj_walking_distance_min, gp.GRB.MINIMIZE)
+        self.model.setObjective(obj_safety_scores_min, gp.GRB.MINIMIZE)
         # self.model.setObjectiveN(obj_fees_min, index=1, priority=1, name="Obj2")
         # self.model.setObjective(obj_safety_scores_max, gp.GRB.MAXIMIZE)
         # self.model.setObjective(obj_time_min, gp.GRB.MINIMIZE)
@@ -423,10 +435,10 @@ class PathFinder:
     def calculate_safety_level(self, path):
         safety = 0
         safety_level = {
-            'es': 1,
-            'eb': 2,
-            'ec': 3,
-            'walk': 4
+            'es': 4,
+            'eb': 3,
+            'ec': 2,
+            'walk': 1
         }
         for sequence in path:
             if len(sequence) == 5:
@@ -680,7 +692,7 @@ with open(output_csv_file, 'w', newline='') as csvfile:
             optimization_problem.setup_costs()
             optimization_problem.set_up_fees()
             optimization_problem.set_up_walking_distance()
-            optimization_problem.set_up_safety()
+            optimization_problem.set_up_risk()
             optimization_problem.setup_energy_constraints(50)
             optimization_problem.setup_problem(start_node, 'walk', end_node, 'walk', max_station_changes, rel)
 
