@@ -1,43 +1,252 @@
+import re
+import json
+from tqdm import tqdm
 import random as rn
 import numpy as np
-import matplotlib
-matplotlib.use('macOSX')  # 或者 'Qt5Agg', 'macOSX' 等，根据您的系统环境选择一个合适的后端
+import networkx as nx
+import xml.etree.ElementTree as ET
+# import matplotlib
+# matplotlib.use('macOSX')  # 或者 'Qt5Agg', 'macOSX' 等，根据您的系统环境选择一个合适的后端
 import matplotlib.pyplot as plt
 import math
 
+class GraphHandler:
+    def __init__(self, file_path):
+        self.file_path = file_path
+        self.G = self.create_graph_from_net_xml()
+
+    def create_graph_from_net_xml(self):
+        unique_edges = []
+        connections = []
+        pattern = r"^[A-Za-z]+"
+        tree = ET.parse(self.file_path)
+        root = tree.getroot()
+
+        edge_detail_map = {}
+        for edge in tqdm(root.findall('edge'), desc="Processing edges"):
+            for lane in edge.findall('lane'):
+                edge_id = edge.attrib['id']
+                edge_detail_map[edge_id] = {
+                    'length': float(lane.attrib['length']),
+                    'speed_limit': float(lane.attrib['speed']),
+                    'shape': lane.attrib['shape'],
+                }
+
+        for conn in tqdm(root.findall('connection'), desc="Processing connections", mininterval=1.0):
+            pairs = []
+            from_edge = conn.get('from')
+            to_edge = conn.get('to')
+
+            if from_edge.startswith(":") or re.match(pattern, from_edge) is not None:
+                continue
+            if from_edge not in unique_edges and from_edge != 'gneE29':
+                unique_edges.append(from_edge)
+            if to_edge not in unique_edges:
+                unique_edges.append(to_edge)
+
+            pairs.append(from_edge)
+            pairs.append(to_edge)
+            connections.append(pairs)
+
+        G = nx.DiGraph()
+        for edge in unique_edges:
+            G.add_node(edge, **edge_detail_map.get(edge, {}))
+
+        for from_edge, to_edge in connections:
+            if from_edge in edge_detail_map and to_edge in edge_detail_map:
+                length = edge_detail_map[from_edge]['length']
+                G.add_edge(from_edge, to_edge, weight=length)
+
+        return G
+
+    def get_graph(self):
+        return self.G
+
+
+class PreferenceGenerator:
+    def __init__(self, G, station_types):
+        self.G = G  # original graph
+        self.station_types = station_types  # station_types = ['eb', 'es', 'ec', 'walk']
+        self.node_station_pair = {}
+
+    def generate_node_preferences(self):
+        preferred_station = {}
+        preferred_nodes = ['361409608#3', '3791905#2', '-11685016#2', '369154722#2', '244844370#0', '37721356#0',
+                           '74233405#1', '129774671#0', '23395388#5', '-64270141', '18927706#0', '-42471880',
+                           '67138626#1', '41502636#0', '-75450412', '-23347664#1', '14151839#3', '-12341242#1',
+                           '-13904652',
+                           '-47638297#3']
+
+        for i in self.G.nodes:
+            if i in preferred_nodes:
+                preferred_types = ['eb', 'es', 'ec', 'walk']
+                preferred_station[i] = preferred_types  # random.sample(preferred_types, num_preferred)
+                if 'walk' not in preferred_station[i]:
+                    preferred_station[i].append('walk')
+                self.node_station_pair[i] = preferred_station[i]
+            else:
+                preferred_station[i] = ['']
+
+        return preferred_station, preferred_nodes
+
+class ShortestPathComputer:
+    def __init__(self, graph):
+        self.graph = graph
+
+    def compute_shortest_paths_start(self, start_node, preference_stations):
+        shortest_routes_start = {}
+        for station in preference_stations:
+            try:
+                shortest_path = nx.shortest_path(self.graph, source=start_node, target=station, weight='weight')
+                shortest_routes_start[station] = (
+                    shortest_path,
+                    nx.shortest_path_length(self.graph, source=start_node, target=station, weight='weight'))
+            except nx.NetworkXNoPath:
+                pass
+        return shortest_routes_start
+
+    def compute_shortest_paths_pairs(self, preference_stations):
+        all_shortest_routes_pairs = {}
+        for station1 in preference_stations:
+            for station2 in preference_stations:
+                if station1 != station2:
+                    try:
+                        shortest_path = nx.shortest_path(self.graph, source=station1, target=station2, weight='weight')
+                        all_shortest_routes_pairs[(station1, station2)] = (shortest_path,
+                                                                           nx.shortest_path_length(self.graph,
+                                                                                                   source=station1,
+                                                                                                   target=station2,
+                                                                                                   weight='weight'))
+                    except nx.NetworkXNoPath:
+                        pass
+        return all_shortest_routes_pairs
+
+    def compute_shortest_paths_dest(self, dest_node, preference_stations):
+        shortest_routes_dest = {}
+        for station in preference_stations:
+            try:
+                shortest_path = nx.shortest_path(self.graph, source=station, target=dest_node, weight='weight')
+                shortest_routes_dest[station] = (
+                    shortest_path,
+                    nx.shortest_path_length(self.graph, source=station, target=dest_node, weight='weight'))
+            except nx.NetworkXNoPath:
+                pass
+        return shortest_routes_dest
+
+    def compute_shortest_path_start_end(self, start_node, dest_node):
+        try:
+            shortest_path = nx.shortest_path(self.graph, source=start_node, target=dest_node, weight='weight')
+            shortest_route_start_end = (
+                shortest_path,
+                nx.shortest_path_length(self.graph, source=start_node, target=dest_node, weight='weight'))
+            return shortest_route_start_end
+        except nx.NetworkXNoPath:
+            return None
+
+
+class ReducedGraphCreator:
+    def __init__(self, graph, start_node, dest_node, preference_stations, shortest_routes_start, shortest_routes_dest,
+                 all_shortest_routes_pairs):
+        self.graph = graph
+        self.start_node = start_node
+        self.dest_node = dest_node
+        self.preference_stations = preference_stations
+        self.shortest_routes_start = shortest_routes_start
+        self.shortest_routes_dest = shortest_routes_dest
+        self.all_shortest_routes_pairs = all_shortest_routes_pairs
+        # self.shortest_route_start_end = shortest_route_start_end
+
+    def create_new_graph(self):
+        new_graph = nx.DiGraph()
+
+        new_graph.add_nodes_from([self.start_node, self.dest_node] + self.preference_stations)
+
+        for station in self.preference_stations:
+            try:
+                new_graph.add_edge(station, self.dest_node, weight=self.shortest_routes_dest[station][1])
+            except KeyError:
+                pass
+
+        for station, (shortest_path, cumulative_weight) in self.shortest_routes_start.items():
+            try:
+                new_graph.add_edge(self.start_node, station, weight=cumulative_weight)
+            except KeyError:
+                pass
+
+        for (station1, station2), (shortest_path, cumulative_weight) in self.all_shortest_routes_pairs.items():
+            try:
+                new_graph.add_edge(station1, station2, weight=cumulative_weight)
+            except KeyError:
+                pass
+
+        # if self.shortest_route_start_end is not None:
+        #     new_graph.add_edge(self.start_node, self.dest_node, weight=self.shortest_route_start_end[1])
+
+        return new_graph
 
 # MINIMIZATION
 
 # Initialize random population of parent chormosomes/solutions P
-def random_population(n_var, n_sol, lb, ub):
-    # n_var = numver of variables
-    # n_sol = number of random solutions
-    # lb = lower bound
-    # ub = upper bound
-    pop = np.zeros((n_sol, n_var))
-    for i in range(n_sol):
-        pop[i, :] = np.random.uniform(lb, ub)
-
+def random_population(graph, source, target, mode_options, n_sol):
+    pop = []
+    for _ in range(n_sol):
+        try:
+            path = nx.shortest_path(graph, source=source, target=target, weight='weight')
+            mode_path = [rn.choice(mode_options) for _ in range(len(path) - 1)]
+            pop.append((path, mode_path))
+        except nx.NetworkXNoPath:
+            # Handle the case where no path exists
+            pop.append(([], []))
     return pop
 
 
 # On each iteration, out of 2 randomly selected parents we create 2 offsprings
 # by taking fraction of genes from one parent and remaining fraction from other parent
 def crossover(pop, crossover_rate):
-    offspring = np.zeros((crossover_rate, pop.shape[1]))
-    for i in range(int(crossover_rate / 2)):
-        r1 = np.random.randint(0, pop.shape[0])
-        r2 = np.random.randint(0, pop.shape[0])
+    offspring = []
+    for _ in range(crossover_rate):
+        r1 = np.random.randint(0, len(pop))
+        r2 = np.random.randint(0, len(pop))
         while r1 == r2:
-            r1 = np.random.randint(0, pop.shape[0])
-            r2 = np.random.randint(0, pop.shape[0])
-        cutting_point = np.random.randint(1, pop.shape[1])
-        offspring[2 * i, 0:cutting_point] = pop[r1, 0:cutting_point]
-        offspring[2 * i, cutting_point:] = pop[r2, cutting_point:]
-        offspring[2 * i + 1, 0:cutting_point] = pop[r2, 0:cutting_point]
-        offspring[2 * i + 1, cutting_point:] = pop[r1, cutting_point:]
+            r2 = np.random.randint(0, len(pop))
 
-    return offspring  # arr(crossover_size x n_var)
+        # Combine parts of two paths and modes
+        path1, mode_path1 = pop[r1]
+        path2, mode_path2 = pop[r2]
+        common_nodes = set(path1) & set(path2)
+
+        if common_nodes:
+            cut_node = rn.choice(list(common_nodes))
+            index1 = path1.index(cut_node)
+            index2 = path2.index(cut_node)
+
+            new_path = path1[:index1] + path2[index2:]
+            new_mode_path = mode_path1[:index1] + mode_path2[index2:]
+
+            offspring.append((new_path, new_mode_path))
+        else:
+            offspring.append((path1, mode_path1))  # If no common nodes, keep original path
+    return offspring
+
+
+def mutation(pop, graph, mutation_rate, mode_options):
+    offspring = []
+    for i in range(mutation_rate):
+        r = np.random.randint(0, len(pop))
+        mutated_path, mutated_mode_path = pop[r]
+
+        if len(mutated_path) > 2:
+            mutation_point = np.random.randint(1, len(mutated_path) - 1)
+            neighbors = list(graph.neighbors(mutated_path[mutation_point]))
+            if neighbors:
+                new_node = np.random.choice(neighbors)
+                mutated_path[mutation_point] = new_node
+
+                # Also mutate the mode randomly
+                mutated_mode_path[mutation_point - 1] = rn.choice(mode_options)
+
+        offspring.append((mutated_path, mutated_mode_path))
+    return offspring
 
 
 # On each iteration, out of 2 randomly selected parents we create 2 offsprings
@@ -82,21 +291,30 @@ def local_search(pop, n_sol, step_size):
 
 # Calculate fitness (obj function) values for each chormosome/solution
 # Kursawe function - https://en.wikipedia.org/wiki/Test_functions_for_optimization
-def evaluation(pop):
-    fitness_values = np.zeros((pop.shape[0], 2))  # 2 values for each choromosome/solution
-    for i, x in enumerate(pop):
-        obj1 = 0
-        for j in range(2):
-            obj1 += - 10 * math.exp(-0.2 * math.sqrt((x[j]) ** 2 + (x[j + 1]) ** 2))
+def evaluation(graph, pop, speed_dict, cost_coefficients, profit_margins):
+    fitness_values = []
 
-        obj2 = 0
-        for j in range(3):
-            obj2 += (abs(x[j])) ** 0.8 + 5 * math.sin((x[j]) ** 3)
+    for path, mode_path in pop:
+        if path:
+            total_time = 0
+            total_cost = 0
 
-        fitness_values[i, 0] = obj1
-        fitness_values[i, 1] = obj2
+            for i in range(len(path) - 1):
+                u, v = path[i], path[i + 1]
+                mode = mode_path[i]
+                edge_weight = graph[u][v]['weight']
+                speed = speed_dict.get(u, {}).get(f'{mode}_speed', 1)
+                time = edge_weight / speed
+                total_time += time
 
-    return fitness_values  # arr(pop_size x 2)
+                base_cost = cost_coefficients[mode] * edge_weight
+                total_cost += base_cost * (1 + profit_margins[mode])
+
+            fitness_values.append([total_time, total_cost])
+        else:
+            fitness_values.append([float('inf'), float('inf')])  # Invalid paths have infinite cost/time
+
+    return np.array(fitness_values)
 
 
 # Estimate how tightly clumped fitness values are on Pareto front.
@@ -171,60 +389,113 @@ def pareto_front_finding(fitness_values, pop_index):
 
 # repeat Pareto front selection to build a population within defined size limits
 def selection(pop, fitness_values, pop_size):
-    pop_index_0 = np.arange(pop.shape[0])  # unselected pop ids
-    pop_index = np.arange(pop.shape[0])  # all pop ids. len = len(pop_size)
+    pop_index_0 = np.arange(pop.shape[0])
     pareto_front_index = []
 
-    while len(pareto_front_index) < pop_size:  # pop_size = initial_pop_size
+    while len(pareto_front_index) < pop_size:
         new_pareto_front = pareto_front_finding(fitness_values[pop_index_0, :], pop_index_0)
         total_pareto_size = len(pareto_front_index) + len(new_pareto_front)
 
-        # check the size of pareto_front, if larger than pop_size then remove some
         if total_pareto_size > pop_size:
             number_solutions_needed = pop_size - len(pareto_front_index)
             selected_solutions = remove_using_crowding(fitness_values[new_pareto_front], number_solutions_needed)
             new_pareto_front = new_pareto_front[selected_solutions]
 
         pareto_front_index = np.hstack((pareto_front_index, new_pareto_front))
-        remaining_index = set(pop_index) - set(pareto_front_index)
+        remaining_index = set(pop_index_0) - set(pareto_front_index)
         pop_index_0 = np.array(list(remaining_index))
 
     selected_pop = pop[pareto_front_index.astype(int)]
-
-    return selected_pop  # arr(pop_size x n_var)
+    return selected_pop
 
 
 # Parameters
-n_var = 3  # chromosome has 3 coordinates/genes
+n_var = 3
 lb = [-5, -5, -5]
 ub = [5, 5, 5]
-pop_size = 150  # initial number of chormosomes
-rate_crossover = 20  # number of chromosomes that we apply crossower to
-rate_mutation = 20  # number of chromosomes that we apply mutation to
-rate_local_search = 10  # number of chromosomes that we apply local_search to
-step_size = 0.1  # coordinate displacement during local_search
-maximum_generation = 150  # number of iterations
-pop = random_population(n_var, pop_size, lb, ub)  # initial parents population P
-print(pop.shape)
+pop_size = 50
+rate_crossover = 20
+rate_mutation = 20
+maximum_generation = 150
+mode_options = ['eb', 'es', 'ec', 'walk']
+cost_coefficients = {'eb': 0.01, 'es': 0.02, 'ec': 0.05, 'walk': 0}
+profit_margins = {'eb': 0.10, 'es': 0.12, 'ec': 0.15, 'walk': 0}
+file_path = "DCC.net.xml"
+speed_file_path = 'query_results-0.json'
+od_pairs_file = 'od_pairs.csv'  # Path to the CSV file containing OD pairs
+output_csv_file = 'RG_TimeTest_50_Nodes.csv'  # Output CSV file to store the results
+
+# Create graph from XML file
+graph_handler = GraphHandler(file_path)
+original_G = graph_handler.get_graph()
+
+# Define parameters
+num_nodes = len(original_G.nodes)
+# User preferences
+user_preference = ['eb', 'ec', 'es']
+station_types = ['eb', 'es', 'ec', 'walk']
+node_stations = {i: station_types for i in original_G.nodes}
+start_node = '361450282'
+end_node = '-110407380#1'
+node_stations[start_node] = ['walk']
+node_stations[end_node] = ['walk']
+no_pref_nodes = 10
+# Generate preferred station types for each node (execute only once)
+preference_generator = PreferenceGenerator(original_G, station_types)
+preferred_station, preferred_nodes = preference_generator.generate_node_preferences()
+
+# Compute shortest routes pairs (execute only once)
+shortest_path_computer = ShortestPathComputer(original_G)
+# all_shortest_routes_pairs = shortest_path_computer.compute_shortest_paths_pairs(preferred_nodes)
+
+# Load speed data from JSON
+with open(speed_file_path, 'r') as f:
+    speed_data = json.load(f)
+
+# Create a dictionary for speed data
+speed_dict = {entry['edge_id']: {'pedestrian_speed': float(entry['pedestrian_speed']),
+                                 'bike_speed': float(entry['bike_speed']),
+                                 'car_speed': float(entry['car_speed'])}
+              for entry in speed_data}
+
+
+
+all_shortest_routes_pairs = shortest_path_computer.compute_shortest_paths_pairs(preferred_nodes)
+shortest_routes_start = shortest_path_computer.compute_shortest_paths_start(start_node, preferred_nodes)
+shortest_routes_dest = shortest_path_computer.compute_shortest_paths_dest(end_node, preferred_nodes)
+reduced_graph_creator = ReducedGraphCreator(original_G, start_node, end_node, preferred_nodes,
+                                            shortest_routes_start, shortest_routes_dest,
+                                            all_shortest_routes_pairs)
+# reduced_graph_creator = ReducedGraphCreator(original_G, start_node, end_node, preferred_nodes,
+#                                             shortest_routes_start, shortest_routes_dest,
+#                                             all_shortest_routes_pairs, shortest_route_start_end)
+reduced_G = reduced_graph_creator.create_new_graph()
+
+# Random population initialization
+pop = random_population(reduced_G, 'start_node', 'end_node', mode_options, pop_size)
 
 # NSGA-II main loop
 for i in range(maximum_generation):
-    offspring_from_crossover = crossover(pop, rate_crossover)
-    offspring_from_mutation = mutation(pop, rate_mutation)
-    offspring_from_local_search = local_search(pop, rate_local_search, step_size)
+    offspring_from_crossover = crossover(pop, reduced_G, rate_crossover)
+    offspring_from_mutation = mutation(pop, reduced_G, rate_mutation, mode_options)
 
-    # we append childrens Q (cross-overs, mutations, local search) to paraents P
-    # having parents in the mix, i.e. allowing for parents to progress to next iteration - Elitism
-    pop = np.append(pop, offspring_from_crossover, axis=0)
-    pop = np.append(pop, offspring_from_mutation, axis=0)
-    pop = np.append(pop, offspring_from_local_search, axis=0)
-    # print(pop.shape)
-    fitness_values = evaluation(pop)
-    pop = selection(pop, fitness_values, pop_size)  # we arbitrary set desired pereto front size = pop_size
-    print('iteration:', i)
+    # Append offspring to population
+    pop += offspring_from_crossover
+    pop += offspring_from_mutation
+
+    # Evaluate fitness of the population
+    fitness_values = evaluation(reduced_G, pop, speed_dict, cost_coefficients, profit_margins)
+
+    # Selection process to maintain diversity
+    pop = selection(pop, fitness_values, pop_size)
 
 # Pareto front visualization
-fitness_values = evaluation(pop)
+fitness_values = evaluation(reduced_G, pop, speed_dict, cost_coefficients, profit_margins)
+index = np.arange(pop.shape[0]).astype(int)
+pareto_front_index = pareto_front_finding(fitness_values, index)
+pop = pop[pareto_front_index]
+fitness_values = fitness_values[pareto_front_index]
+
 index = np.arange(pop.shape[0]).astype(int)
 pareto_front_index = pareto_front_finding(fitness_values, index)
 pop = pop[pareto_front_index, :]
