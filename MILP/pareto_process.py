@@ -5,7 +5,7 @@ matplotlib.use('macOSX')  # 或者 'Qt5Agg', 'macOSX' 等，根据您的系统�
 import matplotlib.pyplot as plt
 
 # 读取CSV文件
-df = pd.read_csv('pareto_values1006.csv')
+df = pd.read_csv('pareto_values1010.csv')
 
 # Dropping duplicates
 df_unique = df.drop_duplicates()
@@ -15,10 +15,11 @@ df_unique = df_unique.sort_values(by="Time cost")
 
 # Plotting line plot
 plt.figure(figsize=(10, 6))
-plt.plot(df_unique["Time cost"], df_unique["Fees"], marker='o')  # 添加 marker='o' 以显示每个点的位置
+plt.plot(df_unique["Time cost"], df_unique["Risky"], marker='o')  # 添加 marker='o' 以显示每个点的位置
 plt.xlabel('Time cost (s)')
-plt.ylabel('Fees (€)')
-plt.title('Pareto front of Time Cost vs Fees')
+# plt.ylabel('Fees (€)')
+plt.ylabel('Risky')
+plt.title('Pareto front of Time Cost vs Risk')
 plt.grid(True)
 plt.savefig('pareto front')
 plt.show()
