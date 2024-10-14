@@ -265,9 +265,28 @@ class OptimizationProblem:
 
     def setup_energy_constraints(self, m):
         for i, j in self.G.edges():
-            edge_weight = self.G[i][j]['weight']
+            edge_id = i
+            speeds = self.speed_dict[edge_id]
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
-                self.energy_constraints[i, j, s] = self.calculate_energy(s, edge_weight)
+                if s != 'walk':
+                    if s == 'es':
+                        escooter_calculator = e_scooter.Escooter_PowerConsumptionCalculator()
+                        # 计算能量消耗
+                        self.energy_constraints[i, j, s] = escooter_calculator.calculate(
+                            speeds['bike_speed'], m
+                        )
+                    elif s == 'eb':
+                        ebike_calculator = e_bike.Ebike_PowerConsumptionCalculator()
+                        self.energy_constraints[i, j, s] = ebike_calculator.calculate(
+                            speeds['bike_speed'], m, 1)
+                    else:
+                        ecar_calculator = e_car.ECar_EnergyConsumptionModel(4)
+                        self.energy_constraints[i, j, s] = ecar_calculator.calculate_energy_loss(
+                            speeds['car_speed'])
+                        if self.energy_constraints[i, j, s] == 0:
+                            self.energy_constraints[i, j, s] = 60
+                else:
+                    self.energy_constraints[i, j, s] = 0
 
     def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes, reltol):
         obj_time_min = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
@@ -611,9 +630,9 @@ class ReducedGraphCreator:
 
 
 #################PipeLine to Execute the OD pairs from CSV ###################
-pareto_values = "pareto_values1010.csv"
+pareto_values = "pareto_values1014.csv"
 with open(pareto_values, 'w') as pafile:
-    for rel in [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]:
+    for rel in [0.01, 0.05, 0.07, 0.08, 0.2, 0.3, 0.4, 0.5, 0.6]:
         file_path = "DCC.net.xml"
         speed_file_path = 'query_results-0.json'
         od_pairs_file = 'od_pairs.csv'  # Path to the CSV file containing OD pairs
