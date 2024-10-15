@@ -116,6 +116,8 @@ class OptimizationProblem:
         self.user_preference = user_preference  # user_preference = ['eb', 'ec', 'es']
         self.congestion = congestion
         self.model = None
+        self.total_time = None
+        self.total_bike_time = None
         self.paths = {}
         self.energy_constraints = {}
         self.station_changes = {}
@@ -127,7 +129,6 @@ class OptimizationProblem:
         self.safety_scores = {}
 
     def setup_model(self):
-        # 初始化 Gurobi 模型
         self.model = gp.Model("Minimize_Traversal_Cost")
 
     def setup_decision_variables(self):
@@ -148,6 +149,8 @@ class OptimizationProblem:
                     if s1 != s2:
                         var_name = f"station_change_{i}_{s1}_{s2}"
                         self.station_changes[i, s1, s2] = self.model.addVar(vtype=GRB.BINARY, name=var_name)
+
+        self.total_ebike_time = self.model.addVar(vtype=GRB.CONTINUOUS, name="total_ebike_time")
 
         initial_energy = {  # in wh
             'eb': 50,
@@ -179,8 +182,6 @@ class OptimizationProblem:
                 else:
                     pedestrian_speed = speeds.get('pedestrian_speed', 0)
                     self.costs[i, j, s] = edge_weight / pedestrian_speed if pedestrian_speed != 0 else 1e7
-
-        # 设置站点转换的成本
         for i in self.G.nodes:
             if len(self.preferred_station[i]) > 1:
                 for s1 in self.preferred_station[i]:
@@ -189,6 +190,13 @@ class OptimizationProblem:
                             self.station_change_costs[i, s1, s2] = 0.1
                         else:
                             self.station_change_costs[i, s1, s2] = self.M
+
+            # # 计算总路径时间
+            # total_time_expr = gp.quicksum(
+            #     self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths)
+
+            # 添加总时间约束
+            # self.model.addConstr(self.total_time == total_time_expr, name="total_time_constraint")
 
     def set_up_walking_distance(self):
         for i, j in self.G.edges():
@@ -202,34 +210,62 @@ class OptimizationProblem:
                     self.walk_distances[i, j, s] = (edge_weight ** 2) * 0.001
 
     def set_up_fees(self):
-        # 成本系数
-        cost_coefficients = {
-            'ec': 0.9,  # 电动汽车每公里成本
-            'eb': 0.2,  # 电动自行车每公里成本
-            'es': 0.1,  # 电动滑板车每公里成本
-            'walk': 0  # 步行每公里成本
-        }
-
-        # 利润率
-        profit_margins = {
-            'ec': 1.8,
-            'eb': 0.10,
-            'es': 0.12,
-            'walk': 0
-        }
-
         for i, j in self.G.edges():
-            edge_weight = self.G[i][j]['weight']
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
-                if s != 'walk':
-                    if s not in self.user_preference:
-                        self.fees[i, j, s] = edge_weight * 1e7
-                    else:
-                        base_cost = cost_coefficients[s] * edge_weight / 1000
-                        self.fees[i, j, s] = base_cost + profit_margins[s] * edge_weight / 1000
-                else:
-                    base_cost = cost_coefficients[s] * edge_weight / 1000
-                    self.fees[i, j, s] = base_cost + profit_margins[s] * edge_weight / 1000
+                if s == 'ec':
+                    energy_consumed_kWh = self.energy_constraints[i, j, s]
+                    self.fees[i, j, s] = self.calculate_ecar_fees(energy_consumed_kWh, charging_type='standard')
+                elif s == 'es':
+                    ride_time_seconds = self.costs[i, j, s]
+                    self.fees[i, j, s] = self.calculate_escooter_fees(ride_time_seconds / 3600)
+
+    def calculate_ebike_total_time(self):
+        total_ebike_time_expr = gp.quicksum(
+            self.paths[i, j, s] * self.costs[i, j, s]
+            for i, j, s in self.paths if s == 'eb'
+        )
+        return total_ebike_time_expr
+
+    def calculate_flexible_pricing(self, pride, gamma=0.1, P0=0):
+        total_ebike_time = self.total_ebike_time
+        if total_ebike_time <= 0.5:
+            base_price = 0
+        elif total_ebike_time <= 1:
+            base_price = 0.50
+        elif total_ebike_time <= 2:
+            base_price = 1.50
+        elif total_ebike_time <= 3:
+            base_price = 3.50
+        elif total_ebike_time <= 4:
+            base_price = 6.50
+        else:
+            extra_time = total_ebike_time - 4
+            base_price = 6.50 + (extra_time // 0.5) * 2
+
+        flexible_price = base_price + gamma * (pride - P0)
+
+        return max(flexible_price, 0)
+
+    def calculate_ecar_fees(self, energy_consumed_kWh, charging_type='standard'):
+        price_per_kWh = {
+            'standard': 0.52,  # €0.52/kWh
+            'fast': 0.57,  # €0.57/kWh
+            'high_power': 0.59  # €0.59/kWh
+        }
+
+        # 计算费用
+        total_fees = energy_consumed_kWh * price_per_kWh[charging_type]
+
+        # 最低消费 €5
+        return max(total_fees, 5)
+
+    def calculate_escooter_fees(self, ride_time_seconds):
+        unlock_fee = 0.15  # unlock fees
+        ride_fee_per_min = 0.18  # (€0.18/min)
+        ride_time_minutes = ride_time_seconds / 60
+        total_fees = unlock_fee + ride_fee_per_min * ride_time_minutes
+
+        return total_fees
 
     def set_up_risk(self):
         risky_level = {
@@ -243,27 +279,9 @@ class OptimizationProblem:
             # edge_id = i
             # speeds = self.speed_dict[edge_id]
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
-                # if s != 'walk':
-                #     if s not in self.user_preference:
-                #         self.safety_scores[i, j, s] = -1e7
-                #     else:
-                #         speed = speeds.get('bike_speed' if s in ['eb', 'es'] else 'car_speed', 0)
-                #         self.safety_scores[i, j, s] = (safety_level[s] / (speed * edge_weight)) * 1000
-                # else:
-                #     pedestrian_speed = speeds.get('pedestrian_speed', 0)
-                #     self.safety_scores[i, j, s] = (safety_level[s] / (pedestrian_speed * edge_weight)) * 1000
                 self.safety_scores[i, j, s] = risky_level[s] * (edge_weight **2) * 0.000001
 
-    def calculate_energy(self, s, d):
-        ENERGY_CONSUMPTION_RATES = {
-            'eb': 0.016,  # Wh/m
-            'es': 0.025,  # Wh/m
-            'ec': 0.175,  # Wh/m
-            'walk': 0
-        }
-        return ENERGY_CONSUMPTION_RATES[s] * d
-
-    def setup_energy_constraints(self, m):
+    def setup_energy_constraints(self, m, pal):
         for i, j in self.G.edges():
             edge_id = i
             speeds = self.speed_dict[edge_id]
@@ -271,14 +289,13 @@ class OptimizationProblem:
                 if s != 'walk':
                     if s == 'es':
                         escooter_calculator = e_scooter.Escooter_PowerConsumptionCalculator()
-                        # 计算能量消耗
                         self.energy_constraints[i, j, s] = escooter_calculator.calculate(
                             speeds['bike_speed'], m
                         )
                     elif s == 'eb':
                         ebike_calculator = e_bike.Ebike_PowerConsumptionCalculator()
                         self.energy_constraints[i, j, s] = ebike_calculator.calculate(
-                            speeds['bike_speed'], m, 1)
+                            speeds['bike_speed'], m, pal)
                     else:
                         ecar_calculator = e_car.ECar_EnergyConsumptionModel(4)
                         self.energy_constraints[i, j, s] = ecar_calculator.calculate_energy_loss(
@@ -293,14 +310,19 @@ class OptimizationProblem:
                        gp.quicksum(
                            self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
                            self.station_changes)
-        obj_fees_min = gp.quicksum(self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths)
-        obj_walking_distance_min = gp.quicksum(self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
-        obj_safety_scores_min = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
 
-        # objs_dict = {1: {'objective': obj_time_min, 'priority': 4, 'reltol': 0.01},
-        #             2: {'objective': obj_fees_min, 'priority': 3},
-        #              3: {'objective': obj_walking_distance_min, 'priority': 2},
-        #              4: {'objective': obj_safety_scores_min, 'priority': 1}}
+        # 添加约束，将 eBike 总路径时间与路径选择变量关联
+        total_ebike_time_expr = self.calculate_ebike_total_time()
+
+        self.model.addConstr(self.total_ebike_time == total_ebike_time_expr, name="ebike_time_constraint")
+        ebike_total_fees = self.calculate_ebike_total_time()
+        # 计算其他交通工具的总费用
+        obj_fees_min = gp.quicksum(
+            self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths if s in ['ec', 'es']
+        ) + ebike_total_fees  # 添加 eBike 的动态费用
+        # obj_walking_distance_min = gp.quicksum(self.paths[i, j, s] * self.walk_distances[i, j, s] for i, j, s in self.paths)
+
+        obj_safety_scores_min = gp.quicksum(self.paths[i, j, s] * self.safety_scores[i, j, s] for i, j, s in self.paths)
 
         self.model.ModelSense = gp.GRB.MINIMIZE
         # for i in objs_dict:
@@ -630,141 +652,142 @@ class ReducedGraphCreator:
 
 
 #################PipeLine to Execute the OD pairs from CSV ###################
-pareto_values = "pareto_values1014.csv"
-with open(pareto_values, 'w') as pafile:
-    for rel in [0.01, 0.05, 0.07, 0.08, 0.2, 0.3, 0.4, 0.5, 0.6]:
-        file_path = "DCC.net.xml"
-        speed_file_path = 'query_results-0.json'
-        od_pairs_file = 'od_pairs.csv'  # Path to the CSV file containing OD pairs
-        output_csv_file = 'RG_TimeTest_50_Nodes.csv'  # Output CSV file to store the results
+# pareto_values = "pareto_values1015.csv"
+# with open(pareto_values, 'w') as pafile:
+#     for rel in [0.01, 0.05, 0.07, 0.08, 0.2, 0.3, 0.4, 0.5, 0.6]:
+file_path = "DCC.net.xml"
+speed_file_path = 'query_results-0.json'
+od_pairs_file = 'od_pairs.csv'  # Path to the CSV file containing OD pairs
+output_csv_file = 'RG_TimeTest_50_Nodes.csv'  # Output CSV file to store the results
 
-        # Create graph from XML file
-        graph_handler = GraphHandler(file_path)
-        original_G = graph_handler.get_graph()
+# Create graph from XML file
+graph_handler = GraphHandler(file_path)
+original_G = graph_handler.get_graph()
 
-        # Define parameters
-        num_nodes = len(original_G.nodes)
-        # User preferences
-        user_preference = ['eb', 'ec', 'es']
-        station_types = ['eb', 'es', 'ec', 'walk']
-        node_stations = {i: station_types for i in original_G.nodes}
-        start_node = '361450282'
-        end_node = '-110407380#1'
-        node_stations[start_node] = ['walk']
-        node_stations[end_node] = ['walk']
-        no_pref_nodes = 10
-        max_station_changes = 5
-        M = 1e6
+# Define parameters
+num_nodes = len(original_G.nodes)
+# User preferences
+user_preference = ['eb', 'ec', 'es']
+station_types = ['eb', 'es', 'ec', 'walk']
+node_stations = {i: station_types for i in original_G.nodes}
+start_node = '361450282'
+end_node = '-110407380#1'
+node_stations[start_node] = ['walk']
+node_stations[end_node] = ['walk']
+no_pref_nodes = 10
+max_station_changes = 5
+M = 1e6
 
-        # route_finder = RouteFinder(original_G)
+# route_finder = RouteFinder(original_G)
 
 
-        # Generate preferred station types for each node (execute only once)
-        preference_generator = PreferenceGenerator(original_G, station_types)
-        preferred_station, preferred_nodes = preference_generator.generate_node_preferences()
+# Generate preferred station types for each node (execute only once)
+preference_generator = PreferenceGenerator(original_G, station_types)
+preferred_station, preferred_nodes = preference_generator.generate_node_preferences()
 
-        # Compute shortest routes pairs (execute only once)
-        shortest_path_computer = ShortestPathComputer(original_G)
-        # all_shortest_routes_pairs = shortest_path_computer.compute_shortest_paths_pairs(preferred_nodes)
+# Compute shortest routes pairs (execute only once)
+shortest_path_computer = ShortestPathComputer(original_G)
+# all_shortest_routes_pairs = shortest_path_computer.compute_shortest_paths_pairs(preferred_nodes)
 
-        # Load speed data from JSON
-        with open(speed_file_path, 'r') as f:
-            speed_data = json.load(f)
+# Load speed data from JSON
+with open(speed_file_path, 'r') as f:
+    speed_data = json.load(f)
 
-        # Create a dictionary for speed data
-        speed_dict = {entry['edge_id']: {'pedestrian_speed': float(entry['pedestrian_speed']),
-                                         'bike_speed': float(entry['bike_speed']),
-                                         'car_speed': float(entry['car_speed'])}
-                      for entry in speed_data}
+# Create a dictionary for speed data
+speed_dict = {entry['edge_id']: {'pedestrian_speed': float(entry['pedestrian_speed']),
+                                 'bike_speed': float(entry['bike_speed']),
+                                 'car_speed': float(entry['car_speed'])}
+              for entry in speed_data}
 
-        # Prepare the output CSV file
-        with open(output_csv_file, 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(['Start Node', 'End Node', 'Total Cost', 'Execution Time', 'Optimal Path Sequence',
-                             'Final Route Mapping to original'])
+# Prepare the output CSV file
+with open(output_csv_file, 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(['Start Node', 'End Node', 'Total Cost', 'Execution Time', 'Optimal Path Sequence',
+                     'Final Route Mapping to original'])
 
-            # Read OD pairs from CSV file and execute the main loop
-            with open(od_pairs_file, 'r') as odfile:
-                reader = csv.reader(odfile)
-                # next(reader)  # Skip header row if present
-                for row in reader:
+    # Read OD pairs from CSV file and execute the main loop
+    with open(od_pairs_file, 'r') as odfile:
+        reader = csv.reader(odfile)
+        # next(reader)  # Skip header row if present
+        for row in reader:
 
-                    initial_time = time.time()
+            initial_time = time.time()
 
-                    start_node, end_node = row  # Extract start_node and end_node from the current row
+            start_node, end_node = row  # Extract start_node and end_node from the current row
 
-                    # Compute shortest route pairs for testing only - otherwise outside the loop
-                    all_shortest_routes_pairs = shortest_path_computer.compute_shortest_paths_pairs(preferred_nodes)
+            # Compute shortest route pairs for testing only - otherwise outside the loop
+            all_shortest_routes_pairs = shortest_path_computer.compute_shortest_paths_pairs(preferred_nodes)
 
-                    # Compute shortest routes start
-                    shortest_routes_start = shortest_path_computer.compute_shortest_paths_start(start_node, preferred_nodes)
+            # Compute shortest routes start
+            shortest_routes_start = shortest_path_computer.compute_shortest_paths_start(start_node, preferred_nodes)
 
-                    # Compute shortest routes dest
-                    shortest_routes_dest = shortest_path_computer.compute_shortest_paths_dest(end_node, preferred_nodes)
+            # Compute shortest routes dest
+            shortest_routes_dest = shortest_path_computer.compute_shortest_paths_dest(end_node, preferred_nodes)
 
-                    # compute shortest route between start and end
-                    # shortest_route_start_end = shortest_path_computer.compute_shortest_path_start_end(start_node, end_node)
-                    # Create a new reduced graph
-                    reduced_graph_creator = ReducedGraphCreator(original_G, start_node, end_node, preferred_nodes,
-                                                                shortest_routes_start, shortest_routes_dest,
-                                                                all_shortest_routes_pairs)
-                    # reduced_graph_creator = ReducedGraphCreator(original_G, start_node, end_node, preferred_nodes,
-                    #                                             shortest_routes_start, shortest_routes_dest,
-                    #                                             all_shortest_routes_pairs, shortest_route_start_end)
-                    reduced_G = reduced_graph_creator.create_new_graph()
+            # compute shortest route between start and end
+            # shortest_route_start_end = shortest_path_computer.compute_shortest_path_start_end(start_node, end_node)
+            # Create a new reduced graph
+            reduced_graph_creator = ReducedGraphCreator(original_G, start_node, end_node, preferred_nodes,
+                                                        shortest_routes_start, shortest_routes_dest,
+                                                        all_shortest_routes_pairs)
+            # reduced_graph_creator = ReducedGraphCreator(original_G, start_node, end_node, preferred_nodes,
+            #                                             shortest_routes_start, shortest_routes_dest,
+            #                                             all_shortest_routes_pairs, shortest_route_start_end)
+            reduced_G = reduced_graph_creator.create_new_graph()
 
-                    # Set up and solve the optimization problem
-                    optimization_problem = OptimizationProblem(reduced_G, node_stations, preferred_station, M, speed_dict,
-                                                               user_preference, start_node, end_node)
-                    optimization_problem.setup_model()
-                    optimization_problem.setup_decision_variables()
-                    optimization_problem.setup_costs()
-                    optimization_problem.set_up_fees()
-                    optimization_problem.set_up_walking_distance()
-                    optimization_problem.set_up_risk()
-                    optimization_problem.setup_energy_constraints(50)
-                    optimization_problem.setup_problem(start_node, 'walk', end_node, 'walk', max_station_changes, rel)
+            # Set up and solve the optimization problem
+            optimization_problem = OptimizationProblem(reduced_G, node_stations, preferred_station, M, speed_dict,
+                                                       user_preference, start_node, end_node)
+            rel = 0.01
+            optimization_problem.setup_model()
+            optimization_problem.setup_decision_variables()
+            optimization_problem.setup_costs()
+            optimization_problem.set_up_walking_distance()
+            optimization_problem.set_up_risk()
+            optimization_problem.setup_energy_constraints(50, 1)
+            optimization_problem.set_up_fees()
+            optimization_problem.setup_problem(start_node, 'walk', end_node, 'walk', max_station_changes, rel)
 
-                    try:
-                        # Solve the problem and measure execution time
-                        prob, execution_time = optimization_problem.solve()
-                        optimization_problem.model.write("mymodel.lp")
+            try:
+                # Solve the problem and measure execution time
+                prob, execution_time = optimization_problem.solve()
+                optimization_problem.model.write("mymodel.lp")
 
-                        if optimization_problem.model.status == GRB.OPTIMAL:
-                            num_of_objectives = optimization_problem.model.NumObj  # 获取目标函数的数量
-                            obj_values = []
-                            for i in range(num_of_objectives):
-                                obj_value = optimization_problem.model.getObjective(i).getValue()
-                                obj_values.append(obj_value)
-                                print(f"Objective {i} value: {obj_value}")
-                            obj_values.append(rel)
+                if optimization_problem.model.status == GRB.OPTIMAL:
+                    num_of_objectives = optimization_problem.model.NumObj  # 获取目标函数的数量
+                    obj_values = []
+                    for i in range(num_of_objectives):
+                        obj_value = optimization_problem.model.getObjective(i).getValue()
+                        obj_values.append(obj_value)
+                        print(f"Objective {i} value: {obj_value}")
+                    # obj_values.append(rel)
 
-                            total_cost = optimization_problem.model.getObjective().getValue()
+                    total_cost = optimization_problem.model.getObjective().getValue()
 
-                            # total_cost = pulp.value(prob.objective)
+                    # total_cost = pulp.value(prob.objective)
 
-                            path_finder = PathFinder(reduced_G, optimization_problem.paths,
-                                                     optimization_problem.station_changes,
-                                                     optimization_problem.costs,
-                                                     optimization_problem.station_change_costs,
-                                                     optimization_problem.energy_constraints)
-                            path_sequence, station_change_count, fees, total_time, safety, walking_distance = path_finder.generate_path_sequence(start_node, 'walk', end_node, 'walk')
-                            obj_values.append(path_sequence)
-                            writer_1 = csv.writer(pafile)
-                            writer_1.writerow(obj_values)
-                            print("time:", total_time)
-                            print("fees:", fees)
-                            print("risky:", safety)
-                            # print("walking distance", walking_distance)
+                    path_finder = PathFinder(reduced_G, optimization_problem.paths,
+                                             optimization_problem.station_changes,
+                                             optimization_problem.costs,
+                                             optimization_problem.station_change_costs,
+                                             optimization_problem.energy_constraints)
+                    path_sequence, station_change_count, fees, total_time, safety, walking_distance = path_finder.generate_path_sequence(start_node, 'walk', end_node, 'walk')
+                    # obj_values.append(path_sequence)
+                    # writer_1 = csv.writer(pafile)
+                    # writer_1.writerow(obj_values)
+                    # print("time:", total_time)
+                    # print("fees:", fees)
+                    # print("risky:", safety)
+                    # print("walking distance", walking_distance)
 
-                            end_time = time.time()
-                            Total_time = end_time - initial_time
+                    end_time = time.time()
+                    Total_time = end_time - initial_time
 
-                            # Write results to CSV
-                            writer.writerow([start_node, end_node, total_cost, Total_time, path_sequence])
-                        else:
-                            # Write results to CSV with 'inf' for total cost if no optimal solution is found
-                            writer.writerow([start_node, end_node, 'inf', 'No optimal solution found'])
-                    except pulp.PulpSolverError:
-                        # Write results to CSV with 'inf' for total cost if solver fails
-                        writer.writerow([start_node, end_node, 'inf', 'Solver failed'])
+                    # Write results to CSV
+                    writer.writerow([start_node, end_node, total_cost, Total_time, path_sequence])
+                else:
+                    # Write results to CSV with 'inf' for total cost if no optimal solution is found
+                    writer.writerow([start_node, end_node, 'inf', 'No optimal solution found'])
+            except pulp.PulpSolverError:
+                # Write results to CSV with 'inf' for total cost if solver fails
+                writer.writerow([start_node, end_node, 'inf', 'Solver failed'])
