@@ -5,6 +5,8 @@ import numpy as np
 class ECar_EnergyConsumptionModel:
     def __init__(self, numb):
         # aerodynamic parameter
+        np.random.seed(6)  # 固定 NumPy 的随机数种子
+        random.seed(6)
         self.Paer = np.random.normal(3.12e-5)
         # parameter for rolling resistance with different passengers
         self.Ptir = 0.05 / 1235 * (1235 + numb * 80)
