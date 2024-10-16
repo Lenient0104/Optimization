@@ -92,7 +92,7 @@ class PreferenceGenerator:
                 # 为每个站点生成唯一的 station_types 列表
                 # num_preferred = random.randint(1, len(self.station_types))  # 随机生成 1 到全部 station_types
                 # preferred_types = random.sample(self.station_types, num_preferred)
-                preferred_types = ['es', 'ec', 'walk']
+                preferred_types = ['ec', 'eb', 'walk']
                 preferred_station[i] = preferred_types  # random.sample(preferred_types, num_preferred)
                 if 'walk' not in preferred_station[i]:
                     preferred_station[i].append('walk')
@@ -337,9 +337,15 @@ class OptimizationProblem:
         # 计算每 0.5 小时收费 €2
         extra_time_fees = 2 * extra_intervals
 
+        ebike_fees_total = gp.quicksum(
+            self.paths[i, j, 'eb'] for i, j in self.G.edges() if
+            'eb' in self.node_stations[i] and 'eb' in self.node_stations[j]
+        )
+
         # 定义阶梯费用
         # 注意：对于 z6 区间，我们只累加额外的 extra_time_fees，而不是再加上 6.5
-        ebike_fees = 3.5 + (0.50 * z2) + (1.50 * z3) + (3.50 * z4) + (6.50 * z5) + extra_time_fees
+        # 修改 ebike_fees，使得 3.5 只在选择了 eBike 且路径存在时计入
+        ebike_fees = ebike_fees_total * 0.01 + (0.50 * z2) + (1.50 * z3) + (3.50 * z4) + (6.50 * z5) + extra_time_fees
 
         obj_fees_min = gp.quicksum(
             self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths if s in ['ec', 'es']
@@ -660,9 +666,9 @@ class ReducedGraphCreator:
 
 
 ################PipeLine to Execute the OD pairs from CSV ###################
-pareto_values = "pareto_values1015.csv"
+pareto_values = "pareto_values1016-2.csv"
 with open(pareto_values, 'w') as pafile:
-    for rel in [0.08]:
+    for rel in [0.01, 0.05, 0.07, 0.08, 0.2, 0.3, 0.4, 0.5, 0.6]:
         file_path = "DCC.net.xml"
         speed_file_path = 'query_results-0.json'
         od_pairs_file = 'od_pairs.csv'  # Path to the CSV file containing OD pairs
