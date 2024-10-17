@@ -296,7 +296,7 @@ class OptimizationProblem:
                 else:
                     self.energy_constraints[i, j, s] = 0
 
-    def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes, reltol, pride, gamma=0.1, P0=0):
+    def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes, reltol, pride, gamma=0.01, P0=0):
         # 添加约束，将 eBike 总路径时间与路径选择变量关联
         total_ebike_time_expr = self.calculate_ebike_total_time()
 
@@ -323,7 +323,7 @@ class OptimizationProblem:
         # 新的辅助变量，用来表示 (self.total_ebike_time - 4) 的值
         extra_time = self.model.addVar(vtype=GRB.CONTINUOUS, name="extra_time")
 
-        # 当时间超过4小时时，计算超过4小时的部分（每30分钟收费€2）
+        # 当时间超过4小时时，计算超过4小时的部分（每30分钟收费€0.2）
         self.model.addConstr(extra_time == (self.total_ebike_time - 0.4) * z6, name="extra_time_constraint")
         self.model.addConstr(extra_time >= 0, name="non_negative_extra_time")
 
@@ -334,7 +334,7 @@ class OptimizationProblem:
         self.model.addConstr(extra_intervals <= extra_time / 0.5, name="extra_intervals_upper_bound")
         self.model.addConstr(extra_intervals >= (extra_time - 0.5) / 0.5, name="extra_intervals_lower_bound")
 
-        # 计算每 0.5 小时收费 €2
+        # 计算每 0.5 小时收费 €0.2
         extra_time_fees = 0.2 * extra_intervals
 
         ebike_fees_total = gp.quicksum(
@@ -345,7 +345,7 @@ class OptimizationProblem:
         # 定义阶梯费用
         # 注意：对于 z6 区间，我们只累加额外的 extra_time_fees，而不是再加上 6.5
         # 修改 ebike_fees，使得 3.5 只在选择了 eBike 且路径存在时计入
-        ebike_fees = ebike_fees_total * 0.01 + (0.50 * z2) + (1.50 * z3) + (3.50 * z4) + (6.50 * z5) + extra_time_fees
+        ebike_fees = ebike_fees_total * 0.01 + (0.50 * z2) + (1.50 * z3) + (3.50 * z4) + (6.50 * z5) + extra_time_fees + gamma * (pride - P0)
 
         obj_fees_min = gp.quicksum(
             self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths if s in ['ec', 'es']
@@ -666,7 +666,7 @@ class ReducedGraphCreator:
 
 
 ################PipeLine to Execute the OD pairs from CSV ###################
-pareto_values = "pareto_values1017test.csv"
+pareto_values = "pareto_values1017new.csv"
 with open(pareto_values, 'w') as pafile:
     for rel in [0.01, 0.05, 0.07, 0.08, 0.2, 0.3, 0.4, 0.5, 0.6]:
         file_path = "DCC.net.xml"
