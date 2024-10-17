@@ -92,7 +92,7 @@ class PreferenceGenerator:
                 # 为每个站点生成唯一的 station_types 列表
                 # num_preferred = random.randint(1, len(self.station_types))  # 随机生成 1 到全部 station_types
                 # preferred_types = random.sample(self.station_types, num_preferred)
-                preferred_types = ['ec', 'eb', 'walk']
+                preferred_types = ['ec', 'es', 'eb', 'walk']
                 preferred_station[i] = preferred_types  # random.sample(preferred_types, num_preferred)
                 if 'walk' not in preferred_station[i]:
                     preferred_station[i].append('walk')
@@ -313,18 +313,18 @@ class OptimizationProblem:
         self.model.addConstr(z1 + z2 + z3 + z4 + z5 + z6 == 1, name="time_zone_constraint")
 
         # 添加每个区间的时间约束
-        self.model.addConstr(self.total_ebike_time <= 0.5 + 10 * (1 - z1), name="time_zone_1")  # 对应 z1
-        self.model.addConstr(self.total_ebike_time <= 1 + 10 * (1 - z2), name="time_zone_2")  # 对应 z2
-        self.model.addConstr(self.total_ebike_time <= 2 + 10 * (1 - z3), name="time_zone_3")  # 对应 z3
-        self.model.addConstr(self.total_ebike_time <= 3 + 10 * (1 - z4), name="time_zone_4")  # 对应 z4
-        self.model.addConstr(self.total_ebike_time <= 4 + 10 * (1 - z5), name="time_zone_5")  # 对应 z5
-        self.model.addConstr(self.total_ebike_time >= 4 - 10 * (1 - z6), name="time_zone_6")  # 对应 z6
+        self.model.addConstr(self.total_ebike_time <= 0.05 + 10 * (1 - z1), name="time_zone_1")  # 对应 z1
+        self.model.addConstr(self.total_ebike_time <= 0.1 + 10 * (1 - z2), name="time_zone_2")  # 对应 z2
+        self.model.addConstr(self.total_ebike_time <= 0.2 + 10 * (1 - z3), name="time_zone_3")  # 对应 z3
+        self.model.addConstr(self.total_ebike_time <= 0.3 + 10 * (1 - z4), name="time_zone_4")  # 对应 z4
+        self.model.addConstr(self.total_ebike_time <= 0.4 + 10 * (1 - z5), name="time_zone_5")  # 对应 z5
+        self.model.addConstr(self.total_ebike_time >= 0.4 - 10 * (1 - z6), name="time_zone_6")  # 对应 z6
 
         # 新的辅助变量，用来表示 (self.total_ebike_time - 4) 的值
         extra_time = self.model.addVar(vtype=GRB.CONTINUOUS, name="extra_time")
 
         # 当时间超过4小时时，计算超过4小时的部分（每30分钟收费€2）
-        self.model.addConstr(extra_time == (self.total_ebike_time - 4) * z6, name="extra_time_constraint")
+        self.model.addConstr(extra_time == (self.total_ebike_time - 0.4) * z6, name="extra_time_constraint")
         self.model.addConstr(extra_time >= 0, name="non_negative_extra_time")
 
         # 定义整数变量 extra_intervals 表示每 0.5 小时的增量
@@ -335,7 +335,7 @@ class OptimizationProblem:
         self.model.addConstr(extra_intervals >= (extra_time - 0.5) / 0.5, name="extra_intervals_lower_bound")
 
         # 计算每 0.5 小时收费 €2
-        extra_time_fees = 2 * extra_intervals
+        extra_time_fees = 0.2 * extra_intervals
 
         ebike_fees_total = gp.quicksum(
             self.paths[i, j, 'eb'] for i, j in self.G.edges() if
@@ -666,7 +666,7 @@ class ReducedGraphCreator:
 
 
 ################PipeLine to Execute the OD pairs from CSV ###################
-pareto_values = "pareto_values1016-2.csv"
+pareto_values = "pareto_values1017test.csv"
 with open(pareto_values, 'w') as pafile:
     for rel in [0.01, 0.05, 0.07, 0.08, 0.2, 0.3, 0.4, 0.5, 0.6]:
         file_path = "DCC.net.xml"
