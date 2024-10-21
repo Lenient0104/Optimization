@@ -320,10 +320,10 @@ class OptimizationProblem:
         self.model.addConstr(self.total_ebike_time <= 0.4 + 10 * (1 - z5), name="time_zone_5")  # 对应 z5
         self.model.addConstr(self.total_ebike_time >= 0.4 - 10 * (1 - z6), name="time_zone_6")  # 对应 z6
 
-        # 新的辅助变量，用来表示 (self.total_ebike_time - 4) 的值
+        # 新的辅助变量，用来表示 (self.total_ebike_time - 0.4) 的值
         extra_time = self.model.addVar(vtype=GRB.CONTINUOUS, name="extra_time")
 
-        # 当时间超过4小时时，计算超过4小时的部分（每30分钟收费€0.2）
+        # 当时间超过4小时时，计算超过0.4小时的部分（每30分钟收费€0.2）
         self.model.addConstr(extra_time == (self.total_ebike_time - 0.4) * z6, name="extra_time_constraint")
         self.model.addConstr(extra_time >= 0, name="non_negative_extra_time")
 
