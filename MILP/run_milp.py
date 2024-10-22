@@ -11,11 +11,6 @@ from gurobipy import GRB
 import time
 
 
-######################O*****************Original END *********************
-##########################################################################
-
-
-################PipeLine to Execute the OD pairs from CSV ###################
 pareto_values = "pareto_values1017new.csv"
 with open(pareto_values, 'w') as pafile:
     for rel in [0.01, 0.05, 0.07, 0.08, 0.2, 0.3, 0.4, 0.5, 0.6]:

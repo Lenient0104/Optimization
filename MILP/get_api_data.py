@@ -10,7 +10,7 @@ if response.status_code == 200:
     data = response.json()
 
     # Save the data to a JSON file
-    with open('map_data.json', 'w') as json_file:
+    with open('openchargemap_data.json', 'w') as json_file:
         json.dump(data, json_file, indent=4)  # 'indent=4' is used for pretty printing the JSON
 
     print("Data saved to gtfs_data.json")
