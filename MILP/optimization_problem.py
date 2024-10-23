@@ -1,18 +1,6 @@
-import random
-import pulp
-import time
-import numpy as np  # 1.21.0
-import random
-# import matplotlib.pyplot as plt  # 3.3.2
-from tqdm import tqdm
 from energy_consumption_model import e_scooter
 from energy_consumption_model import e_bike
 from energy_consumption_model import e_car
-import xml.etree.ElementTree as ET
-import networkx as nx
-import re
-import json
-import csv
 import gurobipy as gp
 from gurobipy import GRB
 import time
