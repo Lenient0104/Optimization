@@ -2,6 +2,7 @@ import threading
 
 import pulp
 import json
+from user import User
 from graphhandler import GraphHandler
 from preference_generator import PreferenceGenerator
 from shortestpath_computer import ShortestPathComputer
@@ -14,7 +15,7 @@ import time
 
 
 class RunMilp:
-    def __init__(self, user_preferences):
+    def __init__(self):
         file_path = "DCC.net.xml"
         speed_file_path = 'query_results-0.json'
 
@@ -44,27 +45,16 @@ class RunMilp:
                            for entry in self.speed_data}
         self.resource_lock = threading.Lock()
 
-    def user_task(self, user):
-        lock = self.resource_lock.acquire()
+    def user_task(self, user: User):
+        self.resource_lock.acquire()
         try:
-            # Gurobi optimization
-            result = self.optimize_with_gurobi(user)
-
-            # 优化完成后，更新资源状态
-            self.update_resource_state(user_id, result)
+            path = self.optimize_with_gurobi(user)[0]
+            self.update_preferred_station(self.preferred_station, path)
         finally:
-            # 释放锁，让其他用户可以访问资源
             self.resource_lock.release()
 
-    def update_resource_state(user_id, result):
-        global vehicle_battery
-        print(f"User {user_id} updating resource...")
-        for vehicle, used_battery in result.items():
-            vehicle_battery[vehicle] -= used_battery
-        print(f"Updated vehicle battery state: {vehicle_battery}")
-
     def optimize_with_gurobi(self, user):
-        output_csv_file = 'RG_TimeTest_50_Nodes.csv'
+        output_csv_file = 'multi-users.csv'
         # Prepare the output CSV file
         with open(output_csv_file, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
@@ -103,14 +93,25 @@ class RunMilp:
             optimization_problem.setup_decision_variables()
             optimization_problem.setup_costs()
             optimization_problem.set_up_risk()
-            optimization_problem.setup_energy_constraints(50, 1)
+            optimization_problem.setup_energy(50, 1)
+            optimization_problem.setup_max_energy_constraints()
+            optimization_problem.setup_energy_constraints()
             optimization_problem.set_up_fees()
             optimization_problem.setup_problem(start_node, 'walk', end_node, 'walk', user.max_station_changes, rel, 20)
+            path_sequence = None
+            station_change_count = None
+            fees = None
+            total_time = None
+            safety = None
+            walking_distance = None
 
             try:
                 # prob, execution_time = optimization_problem.solve()
                 optimization_problem.solve()
-                optimization_problem.model.write("mymodel.lp")
+                optimization_problem.model.computeIIS()
+                optimization_problem.model.write("model.ilp")
+
+                # optimization_problem.model.write("mymodel.lp")
 
                 if optimization_problem.model.status == GRB.OPTIMAL:
                     num_of_objectives = optimization_problem.model.NumObj
@@ -129,7 +130,7 @@ class RunMilp:
                                                 optimization_problem.station_changes,
                                                 optimization_problem.costs,
                                                 optimization_problem.station_change_costs,
-                                                optimization_problem.energy_constraints)
+                                                optimization_problem.energy)
                     path_sequence, station_change_count, fees, total_time, safety, walking_distance = path_finder.generate_path_sequence(
                         start_node, 'walk', end_node, 'walk')
                     obj_values.append(path_sequence)
@@ -206,6 +207,26 @@ class RunMilp:
                 start_node, end_node, from_type, to_type = step
                 print(f"Transition from {from_type} to {to_type} at station {start_node}.")
 
+    def run_user(self):
+
+        user_A = User(1, ['eb', 'es', 'ec'], "361450282", "-110407380#1", 3, self.original_G)
+        user_B = User(2, ['eb', 'es', 'ec'], "361450282", "-110407380#1", 3, self.original_G)
+
+        # 模拟两个用户同时请求资源分配
+        thread_A = threading.Thread(target=self.user_task, args=(user_A,))
+        thread_B = threading.Thread(target=self.user_task, args=(user_B,))
+
+        # 同时启动两个用户的任务
+        thread_A.start()
+        thread_B.start()
+
+        # 等待两个用户的任务都完成
+        thread_A.join()
+        thread_B.join()
+
+        print("All tasks completed.")
 
 
-
+if __name__ == "__main__":
+    runner = RunMilp()
+    runner.run_user()

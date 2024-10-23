@@ -5,8 +5,6 @@ class User:
         self.source = source
         self.destination = destination
         self.max_station_changes = max_station_changes
-        # start_node = '361450282'
-        # end_node = '-110407380#1'
         station_types = ['eb', 'es', 'ec', 'walk']
         self.node_stations = {i: station_types for i in original_G.nodes}
         self.node_stations[self.source] = ['walk']

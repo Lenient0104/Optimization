@@ -22,7 +22,7 @@ class OptimizationProblem:
         self.total_time = None
         self.total_bike_time = None
         self.paths = {}
-        self.energy_constraints = {}
+        self.energy = {}
         self.station_changes = {}
         self.costs = {}
         self.fees = {}
@@ -30,9 +30,13 @@ class OptimizationProblem:
         self.station_change_costs = {}
         self.walk_distances = {}
         self.safety_scores = {}
+        self.vehicle_info = {}
+        self.current_vehicle = None  # 用来记录当前使用的车辆
+
 
     def setup_model(self):
         self.model = gp.Model("Minimize_Traversal_Cost")
+        self.total_ebike_time = self.model.addVar(vtype=GRB.CONTINUOUS, name="total_ebike_time")
 
     def setup_decision_variables(self):
         if self.model is None:
@@ -47,27 +51,11 @@ class OptimizationProblem:
                 self.paths[i, j, s] = self.model.addVar(vtype=GRB.BINARY, name=var_name)
 
         for i in self.G.nodes:
-            for s1 in self.preferred_station[i]:
-                for s2 in self.preferred_station[i]:
+            for s1 in self.preferred_station[i]['types']:
+                for s2 in self.preferred_station[i]['types']:
                     if s1 != s2:
                         var_name = f"station_change_{i}_{s1}_{s2}"
                         self.station_changes[i, s1, s2] = self.model.addVar(vtype=GRB.BINARY, name=var_name)
-
-        self.total_ebike_time = self.model.addVar(vtype=GRB.CONTINUOUS, name="total_ebike_time")
-
-        initial_energy = {  # in wh
-            'eb': 50,
-            'es': 50,
-            'ec': 3000,
-            'walk': 0
-        }
-
-        for i in self.G.nodes:
-            self.energy_vars[i] = {}
-            for s in self.node_stations[i]:
-                var_name = f"energy_{i}_{s}"
-                self.energy_vars[i][s] = self.model.addVar(vtype=GRB.CONTINUOUS, name=var_name)
-                self.model.addConstr(self.energy_vars[i][s] == initial_energy[s], name=f"InitialEnergy_{i}_{s}")
 
     def setup_costs(self):
         for i, j in self.G.edges():
@@ -87,14 +75,13 @@ class OptimizationProblem:
                     self.costs[i, j, s] = edge_weight / pedestrian_speed if pedestrian_speed != 0 else 1e7
 
         for i in self.G.nodes:
-            if len(self.preferred_station[i]) > 1:
-                for s1 in self.preferred_station[i]:
-                    for s2 in self.preferred_station[i]:
+            if len(self.preferred_station[i]['types']) > 1:
+                for s1 in self.preferred_station[i]['types']:
+                    for s2 in self.preferred_station[i]['types']:
                         if s1 != s2:
                             self.station_change_costs[i, s1, s2] = 0.1
                         else:
                             self.station_change_costs[i, s1, s2] = self.M
-
 
     def set_up_walking_distance(self):
         for i, j in self.G.edges():
@@ -111,7 +98,7 @@ class OptimizationProblem:
         for i, j in self.G.edges():
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
                 if s == 'ec':
-                    energy_consumed_kWh = self.energy_constraints[i, j, s]
+                    energy_consumed_kWh = self.energy[i, j, s]
                     self.fees[i, j, s] = self.calculate_ecar_fees(energy_consumed_kWh, charging_type='standard')
                 elif s == 'es':
                     ride_time_seconds = self.costs[i, j, s]
@@ -123,26 +110,6 @@ class OptimizationProblem:
             for i, j, s in self.paths if s == 'eb'
         )
         return total_ebike_time_expr
-
-    def calculate_flexible_pricing(self, pride, gamma=0.1, P0=0):
-        total_ebike_time = self.total_ebike_time / 3600
-        if total_ebike_time <= 0.5:
-            base_price = 0
-        elif total_ebike_time <= 1:
-            base_price = 0.50
-        elif total_ebike_time <= 2:
-            base_price = 1.50
-        elif total_ebike_time <= 3:
-            base_price = 3.50
-        elif total_ebike_time <= 4:
-            base_price = 6.50
-        else:
-            extra_time = total_ebike_time - 4
-            base_price = 6.50 + (extra_time // 0.5) * 2
-
-        flexible_price = base_price + gamma * (pride - P0)
-
-        return max(flexible_price, 0)
 
     def calculate_ecar_fees(self, energy_consumed_kWh, charging_type='standard'):
         price_per_kWh = {
@@ -175,7 +142,7 @@ class OptimizationProblem:
             for s in set(self.node_stations[i]).intersection(self.node_stations[j]):
                 self.safety_scores[i, j, s] = risky_level[s] * (edge_weight **2) * 0.000001
 
-    def setup_energy_constraints(self, m, pal):
+    def setup_energy(self, m, pal):
         for i, j in self.G.edges():
             edge_id = i
             speeds = self.speed_dict[edge_id]
@@ -183,21 +150,91 @@ class OptimizationProblem:
                 if s != 'walk':
                     if s == 'es':
                         escooter_calculator = e_scooter.Escooter_PowerConsumptionCalculator()
-                        self.energy_constraints[i, j, s] = escooter_calculator.calculate(
+                        self.energy[i, j, s] = escooter_calculator.calculate(
                             speeds['bike_speed'], m
                         )
                     elif s == 'eb':
                         ebike_calculator = e_bike.Ebike_PowerConsumptionCalculator()
-                        self.energy_constraints[i, j, s] = ebike_calculator.calculate(
+                        self.energy[i, j, s] = ebike_calculator.calculate(
                             speeds['bike_speed'], m, pal)
                     else:
                         ecar_calculator = e_car.ECar_EnergyConsumptionModel(4)
-                        self.energy_constraints[i, j, s] = ecar_calculator.calculate_energy_loss(
+                        self.energy[i, j, s] = ecar_calculator.calculate_energy_loss(
                             speeds['car_speed'])
-                        if self.energy_constraints[i, j, s] == 0:
-                            self.energy_constraints[i, j, s] = 60
+                        if self.energy[i, j, s] == 0:
+                            self.energy[i, j, s] = 60
                 else:
-                    self.energy_constraints[i, j, s] = 0
+                    self.energy[i, j, s] = 0
+
+    def setup_max_energy_constraints(self):
+        # 初始化能量变量并设置为站点中最大能量的车辆的能量
+        for i in self.G.nodes:
+            self.energy_vars[i] = {}  # 初始化每个节点的能量字典
+            for s in self.node_stations[i]:
+                var_name = f"energy_{i}_{s}"
+                self.energy_vars[i][s] = self.model.addVar(vtype=GRB.CONTINUOUS, name=var_name)
+
+                # 找到该站点中最大能量的车辆
+                max_energy = 0
+                for vehicle in self.preferred_station[i]['vehicles']:
+                    if vehicle['type'] == s:
+                        # 更新 max_energy 为车辆中的最大电量
+                        if vehicle['battery'] > max_energy:
+                            max_energy = vehicle['battery']
+
+                # 将 self.energy_vars[i][s] 初始化为站点中最大能量车辆的电量
+                self.model.addConstr(self.energy_vars[i][s] == max_energy, name=f"InitialEnergy_{i}_{s}")
+
+    def setup_energy_constraints(self):
+        initial_energy = {  # 初始电量（以 wh 为单位）
+            'eb': 500,
+            'es': 500,
+            'ec': 30000,
+            'walk': 0
+        }
+
+        # 遍历每条路径段，处理能量流动和使用约束
+        for i, j in self.G.edges():
+            stations = set(self.node_stations[i]).intersection(self.node_stations[j])
+            if i != self.source and j != self.destination:
+                stations = stations - {'walk'}
+
+                for s in stations:
+                    energy_consumption = self.energy.get((i, j, s), 0)
+
+                    # 判断换乘情况：如果 s1 != s2，需要换乘
+                    for s1 in self.preferred_station[i]['types']:
+                        for s2 in self.preferred_station[i]['types']:
+                            if s1 != s2:
+                                # 获取站点中车辆的能量信息，找到能量最小且满足条件的车辆
+                                min_energy_vehicles = [vehicle for vehicle in self.preferred_station[i]['vehicles'] if
+                                                       vehicle['type'] == s and vehicle['battery'] >= energy_consumption]
+
+                                # 只有当最小能量车辆可以满足能量消耗时，才允许换乘并重置能量
+                                if min_energy_vehicles:
+                                    min_energy = min([vehicle['battery'] for vehicle in min_energy_vehicles])
+                                    # 确保站点有至少一辆符合条件的车辆
+                                    self.model.addConstr(
+                                        len(min_energy_vehicles) >= 1,
+                                        name=f"ValidVehicleAvailable_{i}_{j}_{s}"
+                                    )
+                                    # 能量消耗必须小于最小车辆的能量
+                                    self.model.addConstr(
+                                        self.station_changes[i, s1, s2] * energy_consumption <= min_energy,
+                                        name=f"PathEnergyFeasibilityWithSwitch_{i}_{j}_{s}"
+                                    )
+                                    # 能量重置：新交通工具的能量重置为初始值
+                                    self.model.addConstr(
+                                        self.energy_vars[i][s2] >= self.station_changes[i, s1, s2] * initial_energy[s2],
+                                        name=f"EnergyReset_{i}_{s1}_{s2}"
+                                    )
+
+                    # 能量流动约束：确保从站点 i 到站点 j 的能量流动是正确的
+                    # 这里包含了不换乘的情况
+                    self.model.addConstr(
+                        self.energy_vars[j][s] >= self.energy_vars[i][s] - energy_consumption * self.paths[i, j, s],
+                        name=f"EnergyFlow_{i}_{j}_{s}"
+                    )
 
     def setup_problem(self, start_node, start_station, end_node, end_station, max_station_changes, reltol, pride, gamma=0.01, P0=0):
         # 添加约束，将 eBike 总路径时间与路径选择变量关联
@@ -252,7 +289,7 @@ class OptimizationProblem:
 
         obj_fees_min = gp.quicksum(
             self.paths[i, j, s] * self.fees[i, j, s] for i, j, s in self.paths if s in ['ec', 'es']
-        ) + ebike_fees  # 添加 eBike 的动态费用
+        ) + ebike_fees
 
         obj_time_min = gp.quicksum(self.paths[i, j, s] * self.costs[i, j, s] for i, j, s in self.paths) + \
                        gp.quicksum(self.station_changes[i, s1, s2] * self.station_change_costs[i, s1, s2] for i, s1, s2 in
@@ -296,40 +333,6 @@ class OptimizationProblem:
         self.model.addConstr(gp.quicksum(self.station_changes.values()) <= max_station_changes,
                              name="max_station_changes")
 
-        # energy reset
-        initial_energy = {  # in wh
-            'eb': 50,
-            'es': 50,
-            'ec': 3000,
-            'walk': 0
-        }
-        for i in self.G.nodes:
-            for s1 in self.preferred_station[i]:
-                for s2 in self.preferred_station[i]:
-                    if s1 != s2:
-                        self.model.addConstr(
-                            self.energy_vars[i][s2] >= self.station_changes[i, s1, s2] * initial_energy[s2],
-                            name=f"EnergyReset_{i}_{s1}_{s2}"
-                        )
-
-        for i, j in self.G.edges():
-            stations = set(self.node_stations[i]).intersection(self.node_stations[j])
-            if i != self.source and j != self.destination:
-                stations = stations - {'walk'}
-            for s in stations:
-                energy_consumption = self.energy_constraints[i, j, s]
-
-                self.model.addConstr(
-                    self.paths[i, j, s] * energy_consumption <= self.energy_vars[i][s],
-                    name=f"PathEnergyFeasibility_{i}_{j}_{s}"
-                )
-                # print(self.energy_vars[i][s])
-                self.model.addConstr(
-                    self.energy_vars[j][s] >= self.energy_vars[i][s] - energy_consumption * self.paths[i, j, s],
-                    name=f"EnergyConsumption_{i}_{j}_{s}"
-                )
-                self.model.update()
-                # print(self.energy_vars[i][s])
 
     def solve(self):
         start_time = time.time()

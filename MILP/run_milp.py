@@ -103,7 +103,7 @@ with open(pareto_values, 'w') as pafile:
                     optimization_problem.setup_costs()
                     # optimization_problem.set_up_walking_distance()
                     optimization_problem.set_up_risk()
-                    optimization_problem.setup_energy_constraints(50, 1)
+                    optimization_problem.setup_energy(50, 1)
                     optimization_problem.set_up_fees()
                     optimization_problem.setup_problem(start_node, 'walk', end_node, 'walk', max_station_changes, rel, 20)
 
@@ -129,7 +129,7 @@ with open(pareto_values, 'w') as pafile:
                                                         optimization_problem.station_changes,
                                                         optimization_problem.costs,
                                                         optimization_problem.station_change_costs,
-                                                        optimization_problem.energy_constraints)
+                                                        optimization_problem.energy)
                             path_sequence, station_change_count, fees, total_time, safety, walking_distance = path_finder.generate_path_sequence(start_node, 'walk', end_node, 'walk')
                             obj_values.append(path_sequence)
                             writer_1 = csv.writer(pafile)

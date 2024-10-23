@@ -20,9 +20,9 @@ class PreferenceGenerator:
         vehicle_counts = {'ec': 5, 'es': 10, 'eb': 7}  # 假设每种车辆的初始数量
         vehicle_battery_range = (0.2, 1)  # 电量范围为 20% 到 100%
         initial_energy = {  # in wh
-            'eb': 50,
-            'es': 50,
-            'ec': 3000,
+            'eb': 500,
+            'es': 500,
+            'ec': 30000,
             'walk': 0
         }
 
@@ -39,7 +39,7 @@ class PreferenceGenerator:
                     # 为每种车辆生成一些具体数量的车辆以及它们的电量
                     num_vehicles = vehicle_counts[v_type]  # 假设每个站点的车辆数量是固定的
                     for _ in range(num_vehicles):
-                        battery_level = random.randint(*vehicle_battery_range) * initial_energy[v_type]  # 随机生成电量
+                        battery_level = random.uniform(*vehicle_battery_range) * initial_energy[v_type]  # 随机生成电量
 
                         # 生成全局唯一车辆ID（可以使用计数器或UUID）
                         vehicle_id_counter += 1
