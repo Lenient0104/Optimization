@@ -202,6 +202,11 @@ class OptimizationProblem:
                 for s in stations:
                     energy_consumption = self.energy.get((i, j, s), 0)
 
+                    self.model.addConstr(
+                        self.paths[i, j, s] * energy_consumption <= self.energy_vars[i][s],
+                        name=f"PathEnergyFeasibility_{i}_{j}_{s}"
+                    )
+
                     # 判断换乘情况：如果 s1 != s2，需要换乘
                     for s1 in self.preferred_station[i]['types']:
                         for s2 in self.preferred_station[i]['types']:
@@ -210,9 +215,9 @@ class OptimizationProblem:
                                 min_energy_vehicles = [vehicle for vehicle in self.preferred_station[i]['vehicles'] if
                                                        vehicle['type'] == s and vehicle['battery'] >= energy_consumption]
 
-                                # 只有当最小能量车辆可以满足能量消耗时，才允许换乘并重置能量
+                                # 只有至少一辆车可以满足能量消耗时，才允许换乘并重置能量
                                 if min_energy_vehicles:
-                                    min_energy = min([vehicle['battery'] for vehicle in min_energy_vehicles])
+                                    max_energy = max([vehicle['battery'] for vehicle in min_energy_vehicles])
                                     # 确保站点有至少一辆符合条件的车辆
                                     self.model.addConstr(
                                         len(min_energy_vehicles) >= 1,
@@ -220,7 +225,7 @@ class OptimizationProblem:
                                     )
                                     # 能量消耗必须小于最小车辆的能量
                                     self.model.addConstr(
-                                        self.station_changes[i, s1, s2] * energy_consumption <= min_energy,
+                                        self.station_changes[i, s1, s2] * energy_consumption <= max_energy,
                                         name=f"PathEnergyFeasibilityWithSwitch_{i}_{j}_{s}"
                                     )
                                     # 能量重置：新交通工具的能量重置为初始值
@@ -300,10 +305,11 @@ class OptimizationProblem:
 
         self.model.ModelSense = gp.GRB.MINIMIZE
 
-        # self.model.setObjective(obj_safety_scores_min, gp.GRB.MINIMIZE)
-        self.model.setObjectiveN(obj_time_min, index=1, priority=3, reltol=reltol, name="Time")
-        self.model.setObjectiveN(obj_fees_min, index=2, priority=2, name="Fees")
-        self.model.setObjectiveN(obj_safety_scores_min, index=3, priority=1, name="risky")
+
+        self.model.setObjective(obj_time_min, gp.GRB.MINIMIZE)
+        # self.model.setObjectiveN(obj_time_min, index=1, priority=3, reltol=reltol, name="Time")
+        # self.model.setObjectiveN(obj_fees_min, index=2, priority=2, name="Fees")
+        # self.model.setObjectiveN(obj_safety_scores_min, index=3, priority=1, name="risky")
 
 
         for i in self.G.nodes:

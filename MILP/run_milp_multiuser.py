@@ -95,7 +95,7 @@ class RunMilp:
             optimization_problem.set_up_risk()
             optimization_problem.setup_energy(50, 1)
             optimization_problem.setup_max_energy_constraints()
-            optimization_problem.setup_energy_constraints()
+            # optimization_problem.setup_energy_constraints()
             optimization_problem.set_up_fees()
             optimization_problem.setup_problem(start_node, 'walk', end_node, 'walk', user.max_station_changes, rel, 20)
             path_sequence = None
@@ -108,24 +108,13 @@ class RunMilp:
             try:
                 # prob, execution_time = optimization_problem.solve()
                 optimization_problem.solve()
-                optimization_problem.model.computeIIS()
-                optimization_problem.model.write("model.ilp")
-
+                # optimization_problem.model.computeIIS()
+                # optimization_problem.model.write("model.ilp")
                 # optimization_problem.model.write("mymodel.lp")
 
                 if optimization_problem.model.status == GRB.OPTIMAL:
-                    num_of_objectives = optimization_problem.model.NumObj
-                    obj_values = []
-                    for i in range(num_of_objectives):
-                        obj_value = optimization_problem.model.getObjective(i).getValue()
-                        obj_values.append(obj_value)
-                        print(f"Objective {i} value: {obj_value}")
-                    obj_values.append(rel)
-
                     total_cost = optimization_problem.model.getObjective().getValue()
-
                     # total_cost = pulp.value(prob.objective)
-
                     path_finder = PathGenerator(reduced_G, optimization_problem.paths,
                                                 optimization_problem.station_changes,
                                                 optimization_problem.costs,
@@ -133,7 +122,7 @@ class RunMilp:
                                                 optimization_problem.energy)
                     path_sequence, station_change_count, fees, total_time, safety, walking_distance = path_finder.generate_path_sequence(
                         start_node, 'walk', end_node, 'walk')
-                    obj_values.append(path_sequence)
+                    # obj_values.append(path_sequence)
 
                     end_time = time.time()
                     Total_time = end_time - initial_time
@@ -146,7 +135,7 @@ class RunMilp:
             except pulp.PulpSolverError:
                 # Write results to CSV with 'inf' for total cost if solver fails
                 writer.writerow([start_node, end_node, 'inf', 'Solver failed'])
-        return [path_sequence, station_change_count, fees, total_time, safety, walking_distance]
+            return [path_sequence, station_change_count, fees, total_time, safety, walking_distance]
 
     # 更新 preferred_station 中的车辆电量
     def update_preferred_station(self, preferred_station, path):
@@ -208,7 +197,6 @@ class RunMilp:
                 print(f"Transition from {from_type} to {to_type} at station {start_node}.")
 
     def run_user(self):
-
         user_A = User(1, ['eb', 'es', 'ec'], "361450282", "-110407380#1", 3, self.original_G)
         user_B = User(2, ['eb', 'es', 'ec'], "361450282", "-110407380#1", 3, self.original_G)
 
