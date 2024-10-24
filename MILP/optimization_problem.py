@@ -183,9 +183,9 @@ class OptimizationProblem:
                         # 更新 max_energy 为车辆中的最大电量
                         if vehicle['battery'] > max_energy:
                             max_energy = vehicle['battery']
-                print(max_energy)
+                # print(max_energy)
                 # 将 self.energy_vars[i][s] 初始化为站点中最大能量车辆的电量
-                self.model.addConstr(self.energy_vars[i][s] == max_energy, name=f"InitialEnergy_{i}_{s}")
+                # self.model.addConstr(self.energy_vars[i][s] == max_energy, name=f"InitialEnergy_{i}_{s}")
 
     def setup_energy_constraints(self):
         # 换乘
