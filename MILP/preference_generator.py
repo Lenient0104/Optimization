@@ -20,9 +20,9 @@ class PreferenceGenerator:
         vehicle_counts = {'ec': 5, 'es': 10, 'eb': 7}  # 假设每种车辆的初始数量
         vehicle_battery_range = (0.2, 1)  # 电量范围为 20% 到 100%
         initial_energy = {  # in wh
-            'eb': 500,
-            'es': 500,
-            'ec': 30000,
+            'eb': 50,
+            'es': 50,
+            'ec': 3000,
             'walk': 0
         }
 
