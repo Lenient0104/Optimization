@@ -415,7 +415,6 @@ class OptimizationProblem:
                 stations = stations - {'walk'}
             for s in stations:
                 energy_consumption = self.energy_constraints[i, j, s]
-
                 self.model.addConstr(
                     self.paths[i, j, s] * energy_consumption <= self.energy_vars[i][s],
                     name=f"PathEnergyFeasibility_{i}_{j}_{s}"

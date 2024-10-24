@@ -169,73 +169,62 @@ class OptimizationProblem:
     def setup_max_energy_constraints(self):
         # 初始化能量变量并设置为站点中最大能量的车辆的能量
         for i in self.G.nodes:
-            self.energy_vars[i] = {}  # 初始化每个节点的能量字典
+            self.energy_vars[i] = {}
             for s in self.node_stations[i]:
                 var_name = f"energy_{i}_{s}"
                 self.energy_vars[i][s] = self.model.addVar(vtype=GRB.CONTINUOUS, name=var_name)
-
                 # 找到该站点中最大能量的车辆
                 max_energy = 0
+                if s == 'walk':
+                    self.model.addConstr(self.energy_vars[i][s] == max_energy, name=f"InitialEnergy_{i}_{s}")
+                    continue
                 for vehicle in self.preferred_station[i]['vehicles']:
                     if vehicle['type'] == s:
                         # 更新 max_energy 为车辆中的最大电量
                         if vehicle['battery'] > max_energy:
                             max_energy = vehicle['battery']
-
+                print(max_energy)
                 # 将 self.energy_vars[i][s] 初始化为站点中最大能量车辆的电量
                 self.model.addConstr(self.energy_vars[i][s] == max_energy, name=f"InitialEnergy_{i}_{s}")
 
     def setup_energy_constraints(self):
-        initial_energy = {  # 初始电量（以 wh 为单位）
-            'eb': 500,
-            'es': 500,
-            'ec': 30000,
-            'walk': 0
-        }
+        # 换乘
+        for i in self.G.nodes:
+            max_energy = 0
+            for s1 in self.preferred_station[i]['types']:
+                for s2 in self.preferred_station[i]['types']:
+                    if s1 != s2:
+                        if s2 != 'walk':
+                            # 获取站点中车辆的的数量
+                            min_energy_vehicles = [vehicle for vehicle in self.preferred_station[i]['vehicles'] if
+                                                   vehicle['type'] == s2]
+                            max_energy = max([vehicle['battery'] for vehicle in min_energy_vehicles])
+                            # 确保站点有至少一辆符合条件的车辆
+                            self.model.addConstr(
+                                len(min_energy_vehicles) >= 1,
+                                name=f"ValidVehicleAvailable_{i}_{s2}"
+                            )
+                        # print(max_energy)
+                        # 能量重置：新交通工具的能量重置为站点内能量最大值
+                        self.model.addConstr(
+                            self.energy_vars[i][s2] >= self.station_changes[i, s1, s2] * max_energy,
+                            name=f"EnergyReset_{i}_{s1}_{s2}"
+                        )
+                        max_energy = 0
 
-        # 遍历每条路径段，处理能量流动和使用约束
+        # 每一步能量判断
         for i, j in self.G.edges():
             stations = set(self.node_stations[i]).intersection(self.node_stations[j])
             if i != self.source and j != self.destination:
                 stations = stations - {'walk'}
-
                 for s in stations:
                     energy_consumption = self.energy.get((i, j, s), 0)
-
+                    # 保证能量够用
                     self.model.addConstr(
                         self.paths[i, j, s] * energy_consumption <= self.energy_vars[i][s],
                         name=f"PathEnergyFeasibility_{i}_{j}_{s}"
                     )
-
-                    # 判断换乘情况：如果 s1 != s2，需要换乘
-                    for s1 in self.preferred_station[i]['types']:
-                        for s2 in self.preferred_station[i]['types']:
-                            if s1 != s2:
-                                # 获取站点中车辆的能量信息，找到能量最小且满足条件的车辆
-                                min_energy_vehicles = [vehicle for vehicle in self.preferred_station[i]['vehicles'] if
-                                                       vehicle['type'] == s and vehicle['battery'] >= energy_consumption]
-
-                                # 只有至少一辆车可以满足能量消耗时，才允许换乘并重置能量
-                                if min_energy_vehicles:
-                                    max_energy = max([vehicle['battery'] for vehicle in min_energy_vehicles])
-                                    # 确保站点有至少一辆符合条件的车辆
-                                    self.model.addConstr(
-                                        len(min_energy_vehicles) >= 1,
-                                        name=f"ValidVehicleAvailable_{i}_{j}_{s}"
-                                    )
-                                    # 能量消耗必须小于最小车辆的能量
-                                    self.model.addConstr(
-                                        self.station_changes[i, s1, s2] * energy_consumption <= max_energy,
-                                        name=f"PathEnergyFeasibilityWithSwitch_{i}_{j}_{s}"
-                                    )
-                                    # 能量重置：新交通工具的能量重置为初始值
-                                    self.model.addConstr(
-                                        self.energy_vars[i][s2] >= self.station_changes[i, s1, s2] * initial_energy[s2],
-                                        name=f"EnergyReset_{i}_{s1}_{s2}"
-                                    )
-
-                    # 能量流动约束：确保从站点 i 到站点 j 的能量流动是正确的
-                    # 这里包含了不换乘的情况
+                    # 减去能量
                     self.model.addConstr(
                         self.energy_vars[j][s] >= self.energy_vars[i][s] - energy_consumption * self.paths[i, j, s],
                         name=f"EnergyFlow_{i}_{j}_{s}"

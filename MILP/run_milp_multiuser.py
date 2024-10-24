@@ -95,7 +95,7 @@ class RunMilp:
             optimization_problem.set_up_risk()
             optimization_problem.setup_energy(50, 1)
             optimization_problem.setup_max_energy_constraints()
-            # optimization_problem.setup_energy_constraints()
+            optimization_problem.setup_energy_constraints()
             optimization_problem.set_up_fees()
             optimization_problem.setup_problem(start_node, 'walk', end_node, 'walk', user.max_station_changes, rel, 20)
             path_sequence = None
@@ -156,7 +156,7 @@ class RunMilp:
                             # 从站点中移除该车辆
                             preferred_station[start_node]['vehicles'].pop(idx)
                             print(
-                                f"Vehicle {vehicle['id']} taken from station {start_node}. Battery after usage: {vehicle['battery']:.2f}%")
+                                f"Vehicle {vehicle['id']} taken from station {start_node}. Battery after usage: {vehicle['battery']:.2f}")
                             break
 
                 # 处理换乘逻辑：从一种车辆切换到另一种车辆时，还车并取新车
@@ -164,7 +164,7 @@ class RunMilp:
                     'type'] != transport_type:
                     # 先还车
                     print(
-                        f"Vehicle {current_vehicle['id']} returned to station {start_node}. Final battery: {current_vehicle['battery']:.2f}%")
+                        f"Vehicle {current_vehicle['id']} returned to station {start_node}. Final battery: {current_vehicle['battery']:.2f}")
                     preferred_station[start_node]['vehicles'].append(current_vehicle)  # 将车还回站点
 
                     # 再取新车
@@ -176,13 +176,13 @@ class RunMilp:
                             # 从站点中移除该车辆
                             preferred_station[start_node]['vehicles'].pop(idx)
                             print(
-                                f"New vehicle {vehicle['id']} taken from station {start_node}. Battery after usage: {vehicle['battery']:.2f}%")
+                                f"New vehicle {vehicle['id']} taken from station {start_node}. Battery after usage: {vehicle['battery']:.2f}")
                             break
 
                 # 处理还车逻辑：当从车辆切换回步行时，将车辆还回站点
                 elif current_vehicle is not None and transport_type == 'walk':
                     print(
-                        f"Vehicle {current_vehicle['id']} returned to station {start_node}. Final battery: {current_vehicle['battery']:.2f}%")
+                        f"Vehicle {current_vehicle['id']} returned to station {start_node}. Final battery: {current_vehicle['battery']:.2f}")
                     preferred_station[start_node]['vehicles'].append(current_vehicle)  # 将车还回站点
                     current_vehicle = None  # 清空当前车辆
 
@@ -190,7 +190,7 @@ class RunMilp:
                 elif current_vehicle is not None and current_vehicle['type'] == transport_type:
                     current_vehicle['battery'] -= energy_consumption  # 更新电量
                     print(
-                        f"Vehicle {current_vehicle['id']} at station {start_node} used. Battery after usage: {current_vehicle['battery']:.2f}%")
+                        f"Vehicle {current_vehicle['id']} at station {start_node} used. Battery after usage: {current_vehicle['battery']:.2f}")
 
             elif len(step) == 4:  # 不包含电量消耗信息的路径段
                 start_node, end_node, from_type, to_type = step
